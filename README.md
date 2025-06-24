@@ -72,6 +72,8 @@ Choose from 6 carefully crafted color schemes:
 4. **Enable in Obsidian**:
    - Go to Settings → Community Plugins
    - Find "MindfulDo" and toggle it on
+  
+![Image](https://github.com/user-attachments/assets/b99d16f4-b811-40c6-912d-dc231ac1f099)
 
 ### Method 2: BRAT (Beta)
 
