@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # MindfulDo - Obsidian Plugin
 
 *MindfulDo • Do mindfully*
@@ -206,3 +207,7 @@ MIT License - Ești liber să folosești, modifici și distribuți!
 
 *If you find this plugin helpful, consider giving it a ⭐ on GitHub!*
 *Dacă îți este util acest plugin, consideră să îi dai o ⭐ pe GitHub!* 
+=======
+# MindfulDo
+*A calm, beautiful and simple todo list for Obsidian that helps you stay organized without stress.*
+>>>>>>> 578a264304a833ecae6abceb11db3a5cfad0ae79
