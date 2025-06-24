@@ -1,3 +1,5 @@
+![Image](https://github.com/user-attachments/assets/d94b04ce-e71b-4693-972e-6c75740467e3)
+
 # MindfulDo - Obsidian Plugin
 
 *MindfulDo • Do mindfully*
