@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # MindfulDo - Obsidian Plugin
 
 *MindfulDo • Do mindfully*
