@@ -1,4 +1,4 @@
-![Image](https://github.com/user-attachments/assets/d94b04ce-e71b-4693-972e-6c75740467e3)
+![Image](https://github.com/user-attachments/assets/6fd8e924-d5c3-4b11-aec9-313d51c8afdb)
 
 # MindfulDo - Obsidian Plugin
 
