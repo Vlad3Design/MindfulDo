@@ -1,0 +1,11 @@
+{
+	"id": "mindfuldo-vlad",
+	"name": "MindfulDo",
+	"version": "1.1.0",
+	"minAppVersion": "1.6.0",
+	"description": "MindfulDo - A beautiful, responsive task and reminder management plugin with multi-language support, calendar view, and customizable themes. Do mindfully.",
+	"author": "Vlad 3Design",
+	"authorUrl": "https://github.com/vladdesign/mindfuldo-obsidian",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+} 
