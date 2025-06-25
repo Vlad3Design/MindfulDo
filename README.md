@@ -56,7 +56,6 @@ MindfulDo is a beautiful, responsive task and reminder management plugin for Obs
 - **Clean Interface**: Eliminated empty state messages that overlapped buttons
 - **Better Tag Display**: All category tags now show proper colors
 - **Calendar Integration**: Fixed task/reminder display in calendar view
-- **Professional Demo Data**: 20 realistic tasks and 10 reminders for June 2025
 
 ### 🎯 Enhanced Functionality
 - **Sidebar Position Control**: Switch between left and right sidebar placement
@@ -89,14 +88,6 @@ Access plugin settings through: **Settings → Community Plugins → MindfulDo**
 - **Sidebar Position**: Left or right sidebar placement
 - **Notifications**: Enable/disable reminder notifications
 - **Auto-delete Expired**: Automatically remove old reminders
-
-## 🎨 Demo Data
-
-The plugin comes with professional demo data featuring:
-- **20 realistic tasks** across different categories and completion states
-- **10 reminders** showing both expired and upcoming items
-- **June 2025 timeline** for testing calendar functionality
-- **Mixed completion states** to demonstrate sorting and filtering
 
 ## 📱 Usage
 
