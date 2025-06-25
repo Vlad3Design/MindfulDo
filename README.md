@@ -1,6 +1,6 @@
 # MindfulDo - Obsidian Plugin v1.1.0
 
-![MindfulDo Banner](https://raw.githubusercontent.com/vladdesign/mindfuldo-obsidian/main/images/Banner-MindfulDo.jpg)
+![Image](https://github.com/user-attachments/assets/b9b1e7cc-7ed8-4154-a5d5-c298ad3e9658)
 
 MindfulDo is a beautiful, responsive task and reminder management plugin for Obsidian that helps you organize your daily activities mindfully and efficiently.
 
