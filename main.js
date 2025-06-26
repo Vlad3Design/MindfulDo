@@ -37,7 +37,14 @@ var DEFAULT_SETTINGS = {
   userName: "Vlad",
   language: "ro",
   sidebarPosition: "left",
-  autoDeleteExpired: false
+  autoDeleteExpired: false,
+  // Pomodoro Defaults
+  pomodoroWorkTime: 25,
+  pomodoroBreakTime: 5,
+  pomodoroLongBreakTime: 15,
+  pomodoroSessionsBeforeLongBreak: 4,
+  pomodoroAutoStartBreaks: false,
+  pomodoroAutoStartWork: false
 };
 var VIEW_TYPE_RELAXING_TODO = "relaxing-todo-view";
 var RelaxingTodoPlugin = class extends import_obsidian.Plugin {
@@ -47,13 +54,13 @@ var RelaxingTodoPlugin = class extends import_obsidian.Plugin {
       VIEW_TYPE_RELAXING_TODO,
       (leaf) => new RelaxingTodoView(leaf, this)
     );
-    const ribbonIconEl = this.addRibbonIcon("checkmark", "MindfulDo - Lista de Task-uri", (evt) => {
+    const ribbonIconEl = this.addRibbonIcon("checkmark", "MindfulDo - Task Manager", (evt) => {
       this.activateView();
     });
     ribbonIconEl.addClass("relaxing-todo-ribbon-class");
     this.addCommand({
       id: "open-relaxing-todo",
-      name: "Deschide MindfulDo",
+      name: "Open MindfulDo",
       callback: () => {
         this.activateView();
       }
@@ -115,13 +122,24 @@ var RelaxingTodoPlugin = class extends import_obsidian.Plugin {
   }
 };
 var RelaxingTodoView = class extends import_obsidian.ItemView {
-  // 'tasks', 'reminders', 'calendar'
   constructor(leaf, plugin) {
     super(leaf);
     this.tasks = [];
     this.reminders = [];
+    this.habits = [];
     this.currentCategory = "toate";
     this.currentView = "tasks";
+    // 'tasks', 'reminders', 'habits', 'analytics', 'calendar', 'pomodoro'
+    // Pomodoro Timer State
+    this.pomodoroTimer = null;
+    this.pomodoroTimeLeft = 0;
+    // seconds
+    this.pomodoroIsRunning = false;
+    this.pomodoroMode = "work";
+    this.pomodoroCompletedSessions = 0;
+    this.pomodoroCurrentCycle = 1;
+    // Analytics State
+    this.currentAnalyticsWeek = new Date();
     this.currentMonth = new Date().getMonth();
     this.currentYear = new Date().getFullYear();
     this.plugin = plugin;
@@ -146,8 +164,14 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     setInterval(() => this.updateDateTime(), 1e3);
     this.checkExpiredReminders();
     setInterval(() => this.checkExpiredReminders(), 6e4);
+    setInterval(async () => await this.saveData(), 3e4);
   }
   async onClose() {
+    await this.saveData();
+    if (this.pomodoroTimer) {
+      clearInterval(this.pomodoroTimer);
+      this.pomodoroTimer = null;
+    }
   }
   refreshInterface() {
     const container = this.containerEl.children[1];
@@ -169,14 +193,23 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
 
 				<!-- Navigation Tabs -->
 				<div class="navigation-tabs">
-					<button class="nav-tab active" data-view="tasks">
+					<button class="nav-tab active nav-tab-tasks" data-view="tasks">
 						<span>\u{1F4DD}</span> ${this.plugin.settings.language === "ro" ? "Sarcini" : "Tasks"}
 					</button>
-					<button class="nav-tab" data-view="reminders">
+					<button class="nav-tab nav-tab-reminders" data-view="reminders">
 						<span>\u23F0</span> ${this.plugin.settings.language === "ro" ? "Amintiri" : "Reminders"}
 					</button>
-					<button class="nav-tab" data-view="calendar">
+					<button class="nav-tab nav-tab-habits" data-view="habits">
+						<span>\u{1F504}</span> ${this.plugin.settings.language === "ro" ? "Obiceiuri" : "Habits"}
+					</button>
+					<button class="nav-tab nav-tab-analytics" data-view="analytics">
+						<span>\u{1F4CA}</span> Analytics
+					</button>
+					<button class="nav-tab nav-tab-calendar" data-view="calendar">
 						<span>\u{1F4C5}</span> ${this.plugin.settings.language === "ro" ? "Calendar" : "Calendar"}
+					</button>
+					<button class="nav-tab nav-tab-pomodoro" data-view="pomodoro">
+						<span>\u{1F345}</span> Pomodoro
 					</button>
 				</div>
 
@@ -248,6 +281,157 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
 					</div>
 				</div>
 
+				<!-- Habits View -->
+				<div class="view-container" id="habitsView" style="display: none;">
+					<div class="habits-section">
+						<div class="habits-header">
+							<h2 class="habits-title">${this.plugin.settings.language === "ro" ? "Obiceiurile tale" : "Your Habits"}</h2>
+							<div class="habit-counter" id="habitCounter">0 ${this.plugin.settings.language === "ro" ? "obiceiuri" : "habits"}</div>
+						</div>
+
+						<div class="habit-input-section">
+							<div class="habit-input-container">
+								<input type="text" class="habit-name-input" id="habitNameInput" placeholder="${this.plugin.settings.language === "ro" ? "Nume obicei (ex: Bea ap\u0103, Cite\u0219te, Sport)" : "Habit name (e.g., Drink water, Read, Exercise)"}">
+								<button class="add-habit-btn" id="addHabitBtn">${this.plugin.settings.language === "ro" ? "Adaug\u0103" : "Add"}</button>
+							</div>
+							<div class="habit-colors" id="habitColors">
+								<div class="color-option active" data-color="#4CAF50" style="background: #4CAF50;"></div>
+								<div class="color-option" data-color="#2196F3" style="background: #2196F3;"></div>
+								<div class="color-option" data-color="#FF9800" style="background: #FF9800;"></div>
+								<div class="color-option" data-color="#E91E63" style="background: #E91E63;"></div>
+								<div class="color-option" data-color="#9C27B0" style="background: #9C27B0;"></div>
+								<div class="color-option" data-color="#00BCD4" style="background: #00BCD4;"></div>
+							</div>
+						</div>
+
+						<div class="habits-list" id="habitsList"></div>
+					</div>
+				</div>
+
+				<!-- Analytics View -->
+				<div class="view-container" id="analyticsView" style="display: none;">
+					<div class="analytics-section">
+						<div class="analytics-header">
+							<h2 class="analytics-title">${this.plugin.settings.language === "ro" ? "Analiz\u0103 s\u0103pt\u0103m\xE2nal\u0103" : "Weekly Analytics"}</h2>
+							<div class="week-selector">
+								<button class="week-nav-btn" id="prevWeek">\u2039</button>
+								<span class="current-week" id="currentWeek"></span>
+								<button class="week-nav-btn" id="nextWeek">\u203A</button>
+							</div>
+						</div>
+
+						<div class="analytics-cards">
+							<!-- Tasks Analytics -->
+							<div class="analytics-card">
+								<div class="card-header">
+									<h3>\u{1F4DD} ${this.plugin.settings.language === "ro" ? "Sarcini" : "Tasks"}</h3>
+								</div>
+								<div class="card-content">
+									<div class="main-stat">
+										<span class="stat-number" id="weeklyTasksCompleted">0</span>
+										<span class="stat-label">${this.plugin.settings.language === "ro" ? "completate" : "completed"}</span>
+									</div>
+									<div class="sub-stats">
+										<div class="sub-stat">
+											<span class="change-indicator" id="tasksChange">+0%</span>
+											<span>${this.plugin.settings.language === "ro" ? "vs s\u0103pt\u0103m\xE2na trecut\u0103" : "vs last week"}</span>
+										</div>
+										<div class="sub-stat">
+											<span class="peak-day" id="tasksPeakDay">${this.plugin.settings.language === "ro" ? "Cea mai bun\u0103: -" : "Best day: -"}</span>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Habits Analytics -->
+							<div class="analytics-card">
+								<div class="card-header">
+									<h3>\u{1F504} ${this.plugin.settings.language === "ro" ? "Obiceiuri" : "Habits"}</h3>
+								</div>
+								<div class="card-content">
+									<div class="main-stat">
+										<span class="stat-number" id="weeklyHabitsRate">0%</span>
+										<span class="stat-label">${this.plugin.settings.language === "ro" ? "rata de succes" : "success rate"}</span>
+									</div>
+									<div class="sub-stats">
+										<div class="sub-stat">
+											<span class="habits-completed" id="habitsCompleted">0.0 ${this.plugin.settings.language === "ro" ? "habit-uri/zi" : "habits/day"}</span>
+										</div>
+										<div class="sub-stat">
+											<span class="streak-count" id="activeStreaks">0</span>
+											<span>${this.plugin.settings.language === "ro" ? "streak-uri active" : "active streaks"}</span>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Pomodoro Analytics -->
+							<div class="analytics-card">
+								<div class="card-header">
+									<h3>\u{1F345} Pomodoro</h3>
+								</div>
+								<div class="card-content">
+									<div class="main-stat">
+										<span class="stat-number" id="weeklyPomodoroSessions">0</span>
+										<span class="stat-label">${this.plugin.settings.language === "ro" ? "sesiuni" : "sessions"}</span>
+									</div>
+									<div class="sub-stats">
+										<div class="sub-stat">
+											<span class="focus-time" id="totalFocusTime">0h 0min</span>
+											<span>${this.plugin.settings.language === "ro" ? "timp de focus" : "focus time"}</span>
+										</div>
+										<div class="sub-stat">
+											<span class="avg-session" id="avgSessionLength">0min</span>
+											<span>${this.plugin.settings.language === "ro" ? "sesiune medie" : "avg session"}</span>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Productivity Score -->
+							<div class="analytics-card productivity-card">
+								<div class="card-header">
+									<h3>\u26A1 ${this.plugin.settings.language === "ro" ? "Scorul s\u0103pt\u0103m\xE2nii" : "Weekly Score"}</h3>
+								</div>
+								<div class="card-content">
+									<div class="productivity-score">
+										<div class="score-circle">
+											<svg width="120" height="120">
+												<circle cx="60" cy="60" r="50" class="score-bg"></circle>
+												<circle cx="60" cy="60" r="50" class="score-progress" id="scoreProgress"></circle>
+											</svg>
+											<div class="score-text">
+												<span class="score-number" id="productivityScore">0</span>
+												<span class="score-max">/100</span>
+											</div>
+										</div>
+										<div class="score-breakdown">
+											<div class="breakdown-item">
+												<span class="breakdown-label">${this.plugin.settings.language === "ro" ? "Sarcini" : "Tasks"}</span>
+												<span class="breakdown-value" id="tasksScore">0/30</span>
+											</div>
+											<div class="breakdown-item">
+												<span class="breakdown-label">${this.plugin.settings.language === "ro" ? "Obiceiuri" : "Habits"}</span>
+												<span class="breakdown-value" id="habitsScore">0/40</span>
+											</div>
+											<div class="breakdown-item">
+												<span class="breakdown-label">Focus</span>
+												<span class="breakdown-value" id="focusScore">0/30</span>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Daily Breakdown -->
+						<div class="daily-breakdown">
+							<h3>${this.plugin.settings.language === "ro" ? "Activitatea zilnic\u0103" : "Daily Activity"}</h3>
+							<div class="daily-chart" id="dailyChart"></div>
+						</div>
+					</div>
+				</div>
+
 				<!-- Calendar View -->
 				<div class="view-container" id="calendarView" style="display: none;">
 					<div class="calendar-section">
@@ -269,6 +453,90 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
 						</div>
 					</div>
 				</div>
+
+				<!-- Pomodoro View -->
+				<div class="view-container" id="pomodoroView" style="display: none;">
+					<div class="pomodoro-section">
+						<div class="pomodoro-header">
+							<h2 class="pomodoro-title">${this.plugin.settings.language === "ro" ? "Timer Pomodoro" : "Pomodoro Timer"}</h2>
+							<div class="pomodoro-mode" id="pomodoroMode">${this.plugin.settings.language === "ro" ? "Timp de lucru" : "Work Time"}</div>
+						</div>
+
+						<div class="pomodoro-timer">
+							<div class="timer-circle">
+								<svg class="progress-ring" width="200" height="200">
+									<circle cx="100" cy="100" r="90" class="progress-ring-bg"></circle>
+									<circle cx="100" cy="100" r="90" class="progress-ring-fill" id="progressRing"></circle>
+								</svg>
+								<div class="timer-time" id="timerDisplay">25:00</div>
+							</div>
+						</div>
+
+						<div class="pomodoro-controls">
+							<button class="pomodoro-btn start-pause" id="startPauseBtn">
+								<span id="startPauseIcon">\u25B6\uFE0F</span>
+								<span id="startPauseText">${this.plugin.settings.language === "ro" ? "\xCEnceput" : "Start"}</span>
+							</button>
+							<button class="pomodoro-btn reset" id="resetBtn">
+								<span>\u{1F504}</span> ${this.plugin.settings.language === "ro" ? "Reset" : "Reset"}
+							</button>
+							<button class="pomodoro-btn skip" id="skipBtn">
+								<span>\u23ED\uFE0F</span> ${this.plugin.settings.language === "ro" ? "S\u0103rit" : "Skip"}
+							</button>
+						</div>
+
+						<div class="pomodoro-stats">
+							<div class="stat-item">
+								<span class="stat-label">${this.plugin.settings.language === "ro" ? "Sesiuni complete" : "Completed Sessions"}</span>
+								<span class="stat-value" id="completedSessions">0</span>
+							</div>
+							<div class="stat-item">
+								<span class="stat-label">${this.plugin.settings.language === "ro" ? "Ciclul curent" : "Current Cycle"}</span>
+								<span class="stat-value" id="currentCycle">1</span>
+							</div>
+						</div>
+
+										<div class="pomodoro-presets">
+					<h3 class="presets-title">${this.plugin.settings.language === "ro" ? "Preset\u0103ri" : "Presets"}</h3>
+					<div class="presets-grid">
+						<div class="preset-btn" data-preset="classic">
+							<div class="preset-name">${this.plugin.settings.language === "ro" ? "Clasic" : "Classic"}</div>
+							<div class="preset-details">25/5/15</div>
+						</div>
+						<div class="preset-btn" data-preset="extended">
+							<div class="preset-name">${this.plugin.settings.language === "ro" ? "Extins" : "Extended"}</div>
+							<div class="preset-details">45/10/30</div>
+						</div>
+						<div class="preset-btn" data-preset="short">
+							<div class="preset-name">${this.plugin.settings.language === "ro" ? "Scurt" : "Short"}</div>
+							<div class="preset-details">15/3/10</div>
+						</div>
+						<div class="preset-btn" data-preset="custom">
+							<div class="preset-name">${this.plugin.settings.language === "ro" ? "Personalizat" : "Custom"}</div>
+							<div class="preset-details">-/-/-</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="pomodoro-settings-quick">
+					<h3>${this.plugin.settings.language === "ro" ? "Set\u0103ri rapide" : "Quick Settings"}</h3>
+					<div class="quick-settings-grid">
+						<div class="setting-item">
+							<label>${this.plugin.settings.language === "ro" ? "Timp lucru (min)" : "Work Time (min)"}</label>
+							<input type="number" id="workTimeInput" min="1" max="60" value="${this.plugin.settings.pomodoroWorkTime}">
+						</div>
+						<div class="setting-item">
+							<label>${this.plugin.settings.language === "ro" ? "Pauz\u0103 scurt\u0103 (min)" : "Short Break (min)"}</label>
+							<input type="number" id="breakTimeInput" min="1" max="30" value="${this.plugin.settings.pomodoroBreakTime}">
+						</div>
+						<div class="setting-item">
+							<label>${this.plugin.settings.language === "ro" ? "Pauz\u0103 lung\u0103 (min)" : "Long Break (min)"}</label>
+							<input type="number" id="longBreakTimeInput" min="1" max="60" value="${this.plugin.settings.pomodoroLongBreakTime}">
+						</div>
+					</div>
+				</div>
+					</div>
+				</div>
 			</div>
 		`;
     this.setupEventListeners();
@@ -280,6 +548,8 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     const clearCompleted = this.containerEl.querySelector("#clearCompleted");
     const addReminderBtn = this.containerEl.querySelector("#addReminderBtn");
     const reminderTextInput = this.containerEl.querySelector("#reminderTextInput");
+    const addHabitBtn = this.containerEl.querySelector("#addHabitBtn");
+    const habitNameInput = this.containerEl.querySelector("#habitNameInput");
     addBtn == null ? void 0 : addBtn.addEventListener("click", () => this.addTask());
     taskInput == null ? void 0 : taskInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter")
@@ -290,6 +560,17 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     reminderTextInput == null ? void 0 : reminderTextInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter")
         this.addReminder();
+    });
+    addHabitBtn == null ? void 0 : addHabitBtn.addEventListener("click", async () => await this.addHabit());
+    habitNameInput == null ? void 0 : habitNameInput.addEventListener("keypress", async (e) => {
+      if (e.key === "Enter")
+        await this.addHabit();
+    });
+    this.containerEl.querySelectorAll(".color-option").forEach((colorBtn) => {
+      colorBtn.addEventListener("click", (e) => {
+        this.containerEl.querySelectorAll(".color-option").forEach((btn) => btn.classList.remove("active"));
+        e.currentTarget.classList.add("active");
+      });
     });
     this.containerEl.querySelectorAll(".category-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -315,6 +596,55 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
           this.renderCurrentView();
         }
       });
+    });
+    const startPauseBtn = this.containerEl.querySelector("#startPauseBtn");
+    const resetBtn = this.containerEl.querySelector("#resetBtn");
+    const skipBtn = this.containerEl.querySelector("#skipBtn");
+    const workTimeInput = this.containerEl.querySelector("#workTimeInput");
+    const breakTimeInput = this.containerEl.querySelector("#breakTimeInput");
+    const longBreakTimeInput = this.containerEl.querySelector("#longBreakTimeInput");
+    startPauseBtn == null ? void 0 : startPauseBtn.addEventListener("click", () => this.togglePomodoroTimer());
+    resetBtn == null ? void 0 : resetBtn.addEventListener("click", () => this.resetPomodoroTimer());
+    skipBtn == null ? void 0 : skipBtn.addEventListener("click", () => this.skipPomodoroSession());
+    workTimeInput == null ? void 0 : workTimeInput.addEventListener("change", () => {
+      this.plugin.settings.pomodoroWorkTime = parseInt(workTimeInput.value);
+      this.savePomodoroSettingsQuietly();
+      if (!this.pomodoroIsRunning && this.pomodoroMode === "work") {
+        this.initializePomodoroTimer();
+      }
+      this.updateActivePreset();
+    });
+    breakTimeInput == null ? void 0 : breakTimeInput.addEventListener("change", () => {
+      this.plugin.settings.pomodoroBreakTime = parseInt(breakTimeInput.value);
+      this.savePomodoroSettingsQuietly();
+      if (!this.pomodoroIsRunning && this.pomodoroMode === "break") {
+        this.initializePomodoroTimer();
+      }
+      this.updateActivePreset();
+    });
+    longBreakTimeInput == null ? void 0 : longBreakTimeInput.addEventListener("change", () => {
+      this.plugin.settings.pomodoroLongBreakTime = parseInt(longBreakTimeInput.value);
+      this.savePomodoroSettingsQuietly();
+      if (!this.pomodoroIsRunning && this.pomodoroMode === "longBreak") {
+        this.initializePomodoroTimer();
+      }
+      this.updateActivePreset();
+    });
+    this.containerEl.querySelectorAll(".preset-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const preset = e.currentTarget.getAttribute("data-preset");
+        if (preset) {
+          this.applyPomodoroPreset(preset);
+        }
+      });
+    });
+    const prevWeekBtn = this.containerEl.querySelector("#prevWeek");
+    const nextWeekBtn = this.containerEl.querySelector("#nextWeek");
+    prevWeekBtn == null ? void 0 : prevWeekBtn.addEventListener("click", () => {
+      this.navigateToPreviousWeek();
+    });
+    nextWeekBtn == null ? void 0 : nextWeekBtn.addEventListener("click", () => {
+      this.navigateToNextWeek();
     });
   }
   updateDateTime() {
@@ -413,22 +743,58 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
   renderCurrentView() {
     const tasksView = this.containerEl.querySelector("#tasksView");
     const remindersView = this.containerEl.querySelector("#remindersView");
+    const habitsView = this.containerEl.querySelector("#habitsView");
+    const analyticsView = this.containerEl.querySelector("#analyticsView");
     const calendarView = this.containerEl.querySelector("#calendarView");
+    const pomodoroView = this.containerEl.querySelector("#pomodoroView");
     if (this.currentView === "tasks") {
       tasksView == null ? void 0 : tasksView.classList.add("active");
       remindersView == null ? void 0 : remindersView.classList.remove("active");
+      habitsView == null ? void 0 : habitsView.classList.remove("active");
+      analyticsView == null ? void 0 : analyticsView.classList.remove("active");
       calendarView == null ? void 0 : calendarView.classList.remove("active");
+      pomodoroView == null ? void 0 : pomodoroView.classList.remove("active");
       this.renderTasks();
     } else if (this.currentView === "reminders") {
       tasksView == null ? void 0 : tasksView.classList.remove("active");
       remindersView == null ? void 0 : remindersView.classList.add("active");
+      habitsView == null ? void 0 : habitsView.classList.remove("active");
+      analyticsView == null ? void 0 : analyticsView.classList.remove("active");
       calendarView == null ? void 0 : calendarView.classList.remove("active");
+      pomodoroView == null ? void 0 : pomodoroView.classList.remove("active");
       this.renderReminders();
+    } else if (this.currentView === "habits") {
+      tasksView == null ? void 0 : tasksView.classList.remove("active");
+      remindersView == null ? void 0 : remindersView.classList.remove("active");
+      habitsView == null ? void 0 : habitsView.classList.add("active");
+      analyticsView == null ? void 0 : analyticsView.classList.remove("active");
+      calendarView == null ? void 0 : calendarView.classList.remove("active");
+      pomodoroView == null ? void 0 : pomodoroView.classList.remove("active");
+      this.renderHabits();
+    } else if (this.currentView === "analytics") {
+      tasksView == null ? void 0 : tasksView.classList.remove("active");
+      remindersView == null ? void 0 : remindersView.classList.remove("active");
+      habitsView == null ? void 0 : habitsView.classList.remove("active");
+      analyticsView == null ? void 0 : analyticsView.classList.add("active");
+      calendarView == null ? void 0 : calendarView.classList.remove("active");
+      pomodoroView == null ? void 0 : pomodoroView.classList.remove("active");
+      this.renderAnalytics();
     } else if (this.currentView === "calendar") {
       tasksView == null ? void 0 : tasksView.classList.remove("active");
       remindersView == null ? void 0 : remindersView.classList.remove("active");
+      habitsView == null ? void 0 : habitsView.classList.remove("active");
+      analyticsView == null ? void 0 : analyticsView.classList.remove("active");
       calendarView == null ? void 0 : calendarView.classList.add("active");
+      pomodoroView == null ? void 0 : pomodoroView.classList.remove("active");
       this.renderCalendar();
+    } else if (this.currentView === "pomodoro") {
+      tasksView == null ? void 0 : tasksView.classList.remove("active");
+      remindersView == null ? void 0 : remindersView.classList.remove("active");
+      habitsView == null ? void 0 : habitsView.classList.remove("active");
+      analyticsView == null ? void 0 : analyticsView.classList.remove("active");
+      calendarView == null ? void 0 : calendarView.classList.remove("active");
+      pomodoroView == null ? void 0 : pomodoroView.classList.add("active");
+      this.renderPomodoro();
     }
   }
   renderTasks() {
@@ -450,7 +816,12 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     });
     const completedTasks = this.tasks.filter((task) => task.completed);
     const activeTasks = this.tasks.filter((task) => !task.completed);
-    taskCounter.textContent = `${activeTasks.length} task${activeTasks.length !== 1 ? "-uri" : ""}`;
+    const isRomanian = this.plugin.settings.language === "ro";
+    if (isRomanian) {
+      taskCounter.textContent = `${activeTasks.length} ${activeTasks.length !== 1 ? "sarcini" : "sarcin\u0103"}`;
+    } else {
+      taskCounter.textContent = `${activeTasks.length} ${activeTasks.length !== 1 ? "tasks" : "task"}`;
+    }
     clearCompletedBtn.style.display = completedTasks.length > 0 ? "block" : "none";
     if (filteredTasks.length === 0) {
       tasksList.innerHTML = "";
@@ -505,11 +876,13 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     const data = await this.plugin.loadData();
     this.tasks = (data == null ? void 0 : data.tasks) || [];
     this.reminders = (data == null ? void 0 : data.reminders) || [];
+    this.habits = (data == null ? void 0 : data.habits) || [];
   }
   async saveData() {
     const data = await this.plugin.loadData() || {};
     data.tasks = this.tasks;
     data.reminders = this.reminders;
+    data.habits = this.habits;
     await this.plugin.saveData(data);
   }
   getTaskPlaceholder() {
@@ -599,6 +972,7 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     const reminderCounter = this.containerEl.querySelector("#reminderCounter");
     if (!remindersList || !reminderCounter)
       return;
+    const isRomanian = this.plugin.settings.language === "ro";
     const sortedReminders = this.reminders.sort((a, b) => {
       if (a.expired && !b.expired)
         return 1;
@@ -607,7 +981,11 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
     });
     const activeReminders = this.reminders.filter((reminder) => !reminder.expired);
-    reminderCounter.textContent = `${activeReminders.length} ${this.plugin.settings.language === "ro" ? "amintiri" : "reminders"}`;
+    if (isRomanian) {
+      reminderCounter.textContent = `${activeReminders.length} ${activeReminders.length !== 1 ? "amintiri" : "amintire"}`;
+    } else {
+      reminderCounter.textContent = `${activeReminders.length} ${activeReminders.length !== 1 ? "reminders" : "reminder"}`;
+    }
     if (sortedReminders.length === 0) {
       remindersList.innerHTML = `
 				<div class="empty-reminders">
@@ -636,6 +1014,178 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       deleteBtn.addEventListener("click", (e) => {
         const reminderId = parseInt(e.target.getAttribute("data-reminder-id") || "0");
         this.deleteReminder(reminderId);
+      });
+    });
+  }
+  // Habit tracker functionality
+  async addHabit() {
+    var _a;
+    const habitNameInput = this.containerEl.querySelector("#habitNameInput");
+    if (!habitNameInput) {
+      return;
+    }
+    const habitName = habitNameInput.value.trim();
+    if (habitName === "") {
+      return;
+    }
+    const selectedColor = this.containerEl.querySelector(".color-option.active");
+    const color = (selectedColor == null ? void 0 : selectedColor.getAttribute("data-color")) || "#4CAF50";
+    const habit = {
+      id: Date.now(),
+      name: habitName,
+      color,
+      createdAt: this.getLocalDateString(new Date()),
+      streak: 0,
+      bestStreak: 0,
+      completions: {}
+    };
+    this.habits.push(habit);
+    await this.saveData();
+    habitNameInput.value = "";
+    this.containerEl.querySelectorAll(".color-option").forEach((btn) => btn.classList.remove("active"));
+    (_a = this.containerEl.querySelector(".color-option")) == null ? void 0 : _a.classList.add("active");
+    this.renderHabits();
+  }
+  async toggleHabit(id, date) {
+    const habitIndex = this.habits.findIndex((habit2) => habit2.id === id);
+    if (habitIndex === -1)
+      return;
+    const habit = this.habits[habitIndex];
+    const targetDate = date || this.getLocalDateString(new Date());
+    habit.completions[targetDate] = !habit.completions[targetDate];
+    this.updateHabitStreak(habit);
+    await this.saveData();
+    this.renderHabits();
+  }
+  updateHabitStreak(habit) {
+    const today = new Date();
+    const todayStr = this.getLocalDateString(today);
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let tempStreak = 0;
+    const completionDates = Object.keys(habit.completions).filter((date) => habit.completions[date]).sort();
+    if (completionDates.length === 0) {
+      habit.streak = 0;
+      habit.bestStreak = Math.max(0, habit.bestStreak);
+      return;
+    }
+    if (habit.completions[todayStr]) {
+      currentStreak = 1;
+      let checkDate = new Date(today);
+      while (true) {
+        checkDate.setDate(checkDate.getDate() - 1);
+        const dateStr = this.getLocalDateString(checkDate);
+        if (habit.completions[dateStr]) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+    } else {
+      currentStreak = 0;
+    }
+    for (let i = 0; i < completionDates.length; i++) {
+      if (i === 0) {
+        tempStreak = 1;
+      } else {
+        const prevDate = new Date(completionDates[i - 1]);
+        const currDate = new Date(completionDates[i]);
+        const diffTime = currDate.getTime() - prevDate.getTime();
+        const diffDays = Math.ceil(diffTime / (1e3 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          tempStreak++;
+        } else {
+          tempStreak = 1;
+        }
+      }
+      if (tempStreak > bestStreak) {
+        bestStreak = tempStreak;
+      }
+    }
+    habit.streak = currentStreak;
+    habit.bestStreak = Math.max(bestStreak, habit.bestStreak);
+  }
+  async deleteHabit(id) {
+    this.habits = this.habits.filter((habit) => habit.id !== id);
+    await this.saveData();
+    this.renderHabits();
+  }
+  renderHabits() {
+    const habitsList = this.containerEl.querySelector("#habitsList");
+    const habitCounter = this.containerEl.querySelector("#habitCounter");
+    if (!habitsList || !habitCounter)
+      return;
+    const isRomanian = this.plugin.settings.language === "ro";
+    const todayStr = this.getLocalDateString(new Date());
+    const completedToday = this.habits.filter((habit) => habit.completions[todayStr]).length;
+    if (isRomanian) {
+      habitCounter.textContent = `${completedToday}/${this.habits.length} ${this.habits.length !== 1 ? "obiceiuri" : "obicei"} ast\u0103zi`;
+    } else {
+      habitCounter.textContent = `${completedToday}/${this.habits.length} ${this.habits.length !== 1 ? "habits" : "habit"} today`;
+    }
+    if (this.habits.length === 0) {
+      habitsList.innerHTML = "";
+      return;
+    }
+    const today = new Date();
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      days.push(date);
+    }
+    const dayLabels = isRomanian ? ["D", "L", "M", "M", "J", "V", "S"] : ["S", "M", "T", "W", "T", "F", "S"];
+    habitsList.innerHTML = this.habits.map((habit) => {
+      const dayCircles = days.map((date, index) => {
+        const dateStr = this.getLocalDateString(date);
+        const isCompleted = habit.completions[dateStr] || false;
+        const isToday = dateStr === this.getLocalDateString(today);
+        const dayLabel = dayLabels[date.getDay()];
+        return `
+					<div class="habit-day-container">
+						<div class="habit-day ${isCompleted ? "completed" : ""} ${isToday ? "today" : ""}" 
+							 data-habit-id="${habit.id}" 
+							 data-date="${dateStr}"
+							 style="border-color: ${habit.color}; ${isCompleted && !isToday ? `background-color: ${habit.color};` : ""}"
+							 title="${isToday ? isRomanian ? "Ast\u0103zi" : "Today" : date.toLocaleDateString()}">
+							${isCompleted ? "\u2713" : ""}
+						</div>
+						<div class="habit-day-label">${dayLabel}</div>
+					</div>
+				`;
+      }).join("");
+      return `
+				<div class="habit-item">
+					<div class="habit-header">
+						<div class="habit-info">
+							<div class="habit-name" style="color: ${habit.color};">${habit.name}</div>
+							<div class="habit-stats">
+								<span class="streak-current">${habit.streak} ${isRomanian ? "zile" : "days"}</span>
+								<span class="streak-separator">\u2022</span>
+								<span class="streak-best">${isRomanian ? "Record" : "Best"}: ${habit.bestStreak}</span>
+							</div>
+						</div>
+						<button class="habit-delete" data-habit-id="${habit.id}">\xD7</button>
+					</div>
+					<div class="habit-tracking">
+						<div class="habit-days">
+							${dayCircles}
+						</div>
+					</div>
+				</div>
+			`;
+    }).join("");
+    habitsList.querySelectorAll(".habit-day").forEach((dayEl) => {
+      dayEl.addEventListener("click", async (e) => {
+        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
+        const date = e.target.getAttribute("data-date") || "";
+        await this.toggleHabit(habitId, date);
+      });
+    });
+    habitsList.querySelectorAll(".habit-delete").forEach((deleteBtn) => {
+      deleteBtn.addEventListener("click", async (e) => {
+        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
+        await this.deleteHabit(habitId);
       });
     });
   }
@@ -815,6 +1365,455 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       detailsContainer.style.display = "none";
     });
   }
+  // ================== ANALYTICS METHODS ==================
+  renderAnalytics() {
+    this.updateCurrentWeekDisplay();
+    this.calculateWeeklyStats();
+  }
+  navigateToPreviousWeek() {
+    this.currentAnalyticsWeek.setDate(this.currentAnalyticsWeek.getDate() - 7);
+    this.renderAnalytics();
+  }
+  navigateToNextWeek() {
+    this.currentAnalyticsWeek.setDate(this.currentAnalyticsWeek.getDate() + 7);
+    this.renderAnalytics();
+  }
+  updateCurrentWeekDisplay() {
+    const currentWeekEl = this.containerEl.querySelector("#currentWeek");
+    if (!currentWeekEl)
+      return;
+    const startOfWeek = this.getStartOfWeek(this.currentAnalyticsWeek);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    const isRomanian = this.plugin.settings.language === "ro";
+    const startStr = startOfWeek.toLocaleDateString(isRomanian ? "ro-RO" : "en-US", {
+      month: "short",
+      day: "numeric"
+    });
+    const endStr = endOfWeek.toLocaleDateString(isRomanian ? "ro-RO" : "en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+    currentWeekEl.textContent = `${startStr} - ${endStr}`;
+  }
+  getStartOfWeek(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+  }
+  calculateWeeklyStats() {
+    const startOfWeek = this.getStartOfWeek(this.currentAnalyticsWeek);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    const weeklyTasks = this.tasks.filter((task) => {
+      if (!task.completedAt)
+        return false;
+      const completedDate = new Date(task.completedAt);
+      return completedDate >= startOfWeek && completedDate <= endOfWeek;
+    });
+    const totalHabits = this.habits.length;
+    let habitsCompletedDays = 0;
+    let activeStreaks = 0;
+    this.habits.forEach((habit) => {
+      let daysCompleted = 0;
+      for (let d = new Date(startOfWeek); d <= endOfWeek; d.setDate(d.getDate() + 1)) {
+        const dateStr = this.getLocalDateString(d);
+        if (habit.completions[dateStr]) {
+          daysCompleted++;
+        }
+      }
+      if (daysCompleted > 0)
+        habitsCompletedDays += daysCompleted;
+      if (habit.streak > 0)
+        activeStreaks++;
+    });
+    const taskScore = Math.min(30, weeklyTasks.length * 3);
+    const dailyHabitAverage = totalHabits > 0 ? habitsCompletedDays / 7 : 0;
+    const habitScore = Math.min(40, Math.round(dailyHabitAverage * 2.86));
+    const focusScore = Math.min(30, this.pomodoroCompletedSessions * 2);
+    const totalScore = taskScore + habitScore + focusScore;
+    this.updateTasksAnalytics(weeklyTasks, startOfWeek, endOfWeek);
+    this.updateHabitsAnalytics(habitsCompletedDays, totalHabits, activeStreaks);
+    this.updatePomodoroAnalytics();
+    this.updateProductivityScore(totalScore, taskScore, habitScore, focusScore);
+    this.renderDailyChart(startOfWeek, endOfWeek);
+  }
+  updateTasksAnalytics(weeklyTasks, startOfWeek, endOfWeek) {
+    const weeklyTasksEl = this.containerEl.querySelector("#weeklyTasksCompleted");
+    const tasksChangeEl = this.containerEl.querySelector("#tasksChange");
+    const tasksPeakDayEl = this.containerEl.querySelector("#tasksPeakDay");
+    if (weeklyTasksEl) {
+      weeklyTasksEl.textContent = weeklyTasks.length.toString();
+    }
+    const prevWeekStart = new Date(startOfWeek);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const prevWeekEnd = new Date(endOfWeek);
+    prevWeekEnd.setDate(prevWeekEnd.getDate() - 7);
+    const prevWeekTasks = this.tasks.filter((task) => {
+      if (!task.completedAt)
+        return false;
+      const completedDate = new Date(task.completedAt);
+      return completedDate >= prevWeekStart && completedDate <= prevWeekEnd;
+    });
+    if (tasksChangeEl) {
+      const change = prevWeekTasks.length > 0 ? Math.round((weeklyTasks.length - prevWeekTasks.length) / prevWeekTasks.length * 100) : weeklyTasks.length > 0 ? 100 : 0;
+      tasksChangeEl.textContent = `${change >= 0 ? "+" : ""}${change}%`;
+      tasksChangeEl.className = `change-indicator ${change >= 0 ? "positive" : "negative"}`;
+    }
+    if (tasksPeakDayEl) {
+      const dailyCount = {};
+      weeklyTasks.forEach((task) => {
+        const day = new Date(task.completedAt).toLocaleDateString("en-US", { weekday: "long" });
+        dailyCount[day] = (dailyCount[day] || 0) + 1;
+      });
+      let peakDay = "";
+      let maxCount = 0;
+      Object.entries(dailyCount).forEach(([day, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          peakDay = day;
+        }
+      });
+      const isRomanian = this.plugin.settings.language === "ro";
+      const dayNames = {
+        "Monday": isRomanian ? "Luni" : "Monday",
+        "Tuesday": isRomanian ? "Mar\u021Bi" : "Tuesday",
+        "Wednesday": isRomanian ? "Miercuri" : "Wednesday",
+        "Thursday": isRomanian ? "Joi" : "Thursday",
+        "Friday": isRomanian ? "Vineri" : "Friday",
+        "Saturday": isRomanian ? "S\xE2mb\u0103t\u0103" : "Saturday",
+        "Sunday": isRomanian ? "Duminic\u0103" : "Sunday"
+      };
+      const text = isRomanian ? "Cea mai bun\u0103: " : "Best day: ";
+      tasksPeakDayEl.textContent = peakDay ? `${text}${dayNames[peakDay] || peakDay}` : `${text}-`;
+    }
+  }
+  updateHabitsAnalytics(completedDays, totalHabits, activeStreaks) {
+    const habitsRateEl = this.containerEl.querySelector("#weeklyHabitsRate");
+    const habitsCompletedEl = this.containerEl.querySelector("#habitsCompleted");
+    const activeStreaksEl = this.containerEl.querySelector("#activeStreaks");
+    if (habitsRateEl) {
+      const rate = totalHabits > 0 ? Math.round(completedDays / (totalHabits * 7) * 100) : 0;
+      habitsRateEl.textContent = `${rate}%`;
+    }
+    if (habitsCompletedEl) {
+      const dailyAverage = totalHabits > 0 ? completedDays / 7 : 0;
+      const averageText = dailyAverage.toFixed(1);
+      const isRomanian = this.plugin.settings.language === "ro";
+      habitsCompletedEl.textContent = `${averageText} ${isRomanian ? "habit-uri/zi" : "habits/day"}`;
+    }
+    if (activeStreaksEl) {
+      activeStreaksEl.textContent = activeStreaks.toString();
+    }
+  }
+  updatePomodoroAnalytics() {
+    const sessionsEl = this.containerEl.querySelector("#weeklyPomodoroSessions");
+    const focusTimeEl = this.containerEl.querySelector("#totalFocusTime");
+    const avgSessionEl = this.containerEl.querySelector("#avgSessionLength");
+    if (sessionsEl) {
+      sessionsEl.textContent = this.pomodoroCompletedSessions.toString();
+    }
+    if (focusTimeEl) {
+      const totalMinutes = this.pomodoroCompletedSessions * this.plugin.settings.pomodoroWorkTime;
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      focusTimeEl.textContent = `${hours}h ${minutes}min`;
+    }
+    if (avgSessionEl) {
+      avgSessionEl.textContent = `${this.plugin.settings.pomodoroWorkTime}min`;
+    }
+  }
+  updateProductivityScore(total, tasks, habits, focus) {
+    const scoreNumberEl = this.containerEl.querySelector("#productivityScore");
+    const scoreProgressEl = this.containerEl.querySelector("#scoreProgress");
+    const tasksScoreEl = this.containerEl.querySelector("#tasksScore");
+    const habitsScoreEl = this.containerEl.querySelector("#habitsScore");
+    const focusScoreEl = this.containerEl.querySelector("#focusScore");
+    if (scoreNumberEl) {
+      scoreNumberEl.textContent = total.toString();
+    }
+    if (scoreProgressEl) {
+      const circumference = 2 * Math.PI * 50;
+      const progress = total / 100;
+      const strokeDashoffset = circumference - progress * circumference;
+      scoreProgressEl.style.strokeDasharray = `${circumference} ${circumference}`;
+      scoreProgressEl.style.strokeDashoffset = strokeDashoffset.toString();
+    }
+    if (tasksScoreEl)
+      tasksScoreEl.textContent = `${tasks}/30`;
+    if (habitsScoreEl)
+      habitsScoreEl.textContent = `${habits}/40`;
+    if (focusScoreEl)
+      focusScoreEl.textContent = `${focus}/30`;
+  }
+  renderDailyChart(startOfWeek, endOfWeek) {
+    const chartEl = this.containerEl.querySelector("#dailyChart");
+    if (!chartEl)
+      return;
+    const days = [];
+    for (let d = new Date(startOfWeek); d <= endOfWeek; d.setDate(d.getDate() + 1)) {
+      days.push(new Date(d));
+    }
+    const isRomanian = this.plugin.settings.language === "ro";
+    const dayLabels = days.map((d) => d.toLocaleDateString(isRomanian ? "ro-RO" : "en-US", { weekday: "short" }));
+    chartEl.innerHTML = `
+			<div class="chart-days">
+				${days.map((day, index) => {
+      const dateStr = this.getLocalDateString(day);
+      const tasksCount = this.tasks.filter(
+        (task) => task.completedAt && this.getLocalDateString(new Date(task.completedAt)) === dateStr
+      ).length;
+      const habitsCompleted = this.habits.filter((habit) => habit.completions[dateStr]).length;
+      const maxHeight = Math.max(tasksCount, habitsCompleted, 1);
+      return `
+						<div class="chart-day">
+							<div class="chart-bars">
+								<div class="chart-bar tasks" style="height: ${tasksCount / Math.max(maxHeight, 5) * 100}%" title="${tasksCount} tasks"></div>
+								<div class="chart-bar habits" style="height: ${habitsCompleted / Math.max(maxHeight, 5) * 100}%" title="${habitsCompleted} habits"></div>
+							</div>
+							<div class="chart-label">${dayLabels[index]}</div>
+						</div>
+					`;
+    }).join("")}
+			</div>
+			<div class="chart-legend">
+				<div class="chart-legend-item">
+					<div class="chart-legend-color tasks"></div>
+					<span>${isRomanian ? "Sarcini completate" : "Tasks completed"}</span>
+				</div>
+				<div class="chart-legend-item">
+					<div class="chart-legend-color habits"></div>
+					<span>${isRomanian ? "Habit-uri completate" : "Habits completed"}</span>
+				</div>
+			</div>
+		`;
+  }
+  // ================== POMODORO TIMER METHODS ==================
+  async savePomodoroSettingsQuietly() {
+    await this.plugin.saveData(this.plugin.settings);
+  }
+  applyPomodoroPreset(preset) {
+    if (this.pomodoroIsRunning) {
+      this.pausePomodoroTimer();
+    }
+    this.containerEl.querySelectorAll(".preset-btn").forEach((btn) => btn.classList.remove("active"));
+    const activeBtn = this.containerEl.querySelector(`[data-preset="${preset}"]`);
+    if (activeBtn)
+      activeBtn.classList.add("active");
+    switch (preset) {
+      case "classic":
+        this.plugin.settings.pomodoroWorkTime = 25;
+        this.plugin.settings.pomodoroBreakTime = 5;
+        this.plugin.settings.pomodoroLongBreakTime = 15;
+        break;
+      case "extended":
+        this.plugin.settings.pomodoroWorkTime = 45;
+        this.plugin.settings.pomodoroBreakTime = 10;
+        this.plugin.settings.pomodoroLongBreakTime = 30;
+        break;
+      case "short":
+        this.plugin.settings.pomodoroWorkTime = 15;
+        this.plugin.settings.pomodoroBreakTime = 3;
+        this.plugin.settings.pomodoroLongBreakTime = 10;
+        break;
+      case "custom":
+        break;
+    }
+    const workTimeInput = this.containerEl.querySelector("#workTimeInput");
+    const breakTimeInput = this.containerEl.querySelector("#breakTimeInput");
+    const longBreakTimeInput = this.containerEl.querySelector("#longBreakTimeInput");
+    if (workTimeInput)
+      workTimeInput.value = this.plugin.settings.pomodoroWorkTime.toString();
+    if (breakTimeInput)
+      breakTimeInput.value = this.plugin.settings.pomodoroBreakTime.toString();
+    if (longBreakTimeInput)
+      longBreakTimeInput.value = this.plugin.settings.pomodoroLongBreakTime.toString();
+    this.savePomodoroSettingsQuietly();
+    this.initializePomodoroTimer();
+  }
+  renderPomodoro() {
+    this.initializePomodoroTimer();
+    this.updatePomodoroDisplay();
+    this.updateActivePreset();
+  }
+  updateActivePreset() {
+    this.containerEl.querySelectorAll(".preset-btn").forEach((btn) => btn.classList.remove("active"));
+    const { pomodoroWorkTime, pomodoroBreakTime, pomodoroLongBreakTime } = this.plugin.settings;
+    let activePreset = "custom";
+    if (pomodoroWorkTime === 25 && pomodoroBreakTime === 5 && pomodoroLongBreakTime === 15) {
+      activePreset = "classic";
+    } else if (pomodoroWorkTime === 45 && pomodoroBreakTime === 10 && pomodoroLongBreakTime === 30) {
+      activePreset = "extended";
+    } else if (pomodoroWorkTime === 15 && pomodoroBreakTime === 3 && pomodoroLongBreakTime === 10) {
+      activePreset = "short";
+    }
+    const activeBtn = this.containerEl.querySelector(`[data-preset="${activePreset}"]`);
+    if (activeBtn)
+      activeBtn.classList.add("active");
+  }
+  initializePomodoroTimer() {
+    let timeInMinutes;
+    switch (this.pomodoroMode) {
+      case "work":
+        timeInMinutes = this.plugin.settings.pomodoroWorkTime;
+        break;
+      case "break":
+        timeInMinutes = this.plugin.settings.pomodoroBreakTime;
+        break;
+      case "longBreak":
+        timeInMinutes = this.plugin.settings.pomodoroLongBreakTime;
+        break;
+    }
+    this.pomodoroTimeLeft = timeInMinutes * 60;
+    this.updatePomodoroDisplay();
+  }
+  togglePomodoroTimer() {
+    if (this.pomodoroIsRunning) {
+      this.pausePomodoroTimer();
+    } else {
+      this.startPomodoroTimer();
+    }
+  }
+  startPomodoroTimer() {
+    if (this.pomodoroTimeLeft <= 0) {
+      this.initializePomodoroTimer();
+    }
+    this.pomodoroIsRunning = true;
+    this.updateStartPauseButton();
+    this.pomodoroTimer = setInterval(() => {
+      this.pomodoroTimeLeft--;
+      this.updatePomodoroDisplay();
+      if (this.pomodoroTimeLeft <= 0) {
+        this.completePomodoroSession();
+      }
+    }, 1e3);
+  }
+  pausePomodoroTimer() {
+    this.pomodoroIsRunning = false;
+    if (this.pomodoroTimer) {
+      clearInterval(this.pomodoroTimer);
+      this.pomodoroTimer = null;
+    }
+    this.updateStartPauseButton();
+  }
+  resetPomodoroTimer() {
+    this.pausePomodoroTimer();
+    this.initializePomodoroTimer();
+    this.updateStartPauseButton();
+  }
+  skipPomodoroSession() {
+    this.pausePomodoroTimer();
+    this.completePomodoroSession();
+  }
+  completePomodoroSession() {
+    this.pausePomodoroTimer();
+    const isRomanian = this.plugin.settings.language === "ro";
+    if (this.pomodoroMode === "work") {
+      this.pomodoroCompletedSessions++;
+      if (this.plugin.settings.enableNotifications) {
+        new import_obsidian.Notice(isRomanian ? "\u{1F345} Sesiune de lucru complet\u0103! Timp pentru o pauz\u0103." : "\u{1F345} Work session complete! Time for a break.", 5e3);
+      }
+      if (this.pomodoroCompletedSessions % this.plugin.settings.pomodoroSessionsBeforeLongBreak === 0) {
+        this.pomodoroMode = "longBreak";
+        this.pomodoroCurrentCycle++;
+      } else {
+        this.pomodoroMode = "break";
+      }
+    } else {
+      if (this.plugin.settings.enableNotifications) {
+        new import_obsidian.Notice(isRomanian ? "\u26A1 Pauz\u0103 terminat\u0103! \xCEnapoi la lucru." : "\u26A1 Break finished! Back to work.", 5e3);
+      }
+      this.pomodoroMode = "work";
+    }
+    this.initializePomodoroTimer();
+    this.updatePomodoroModeDisplay();
+    this.updateStatsDisplay();
+    this.savePomodoroSettingsQuietly();
+    if (this.pomodoroMode === "work" && this.plugin.settings.pomodoroAutoStartWork || this.pomodoroMode !== "work" && this.plugin.settings.pomodoroAutoStartBreaks) {
+      setTimeout(() => {
+        this.startPomodoroTimer();
+      }, 2e3);
+    }
+  }
+  updatePomodoroDisplay() {
+    const timerDisplay = this.containerEl.querySelector("#timerDisplay");
+    const progressRing = this.containerEl.querySelector("#progressRing");
+    if (timerDisplay) {
+      const minutes = Math.floor(this.pomodoroTimeLeft / 60);
+      const seconds = this.pomodoroTimeLeft % 60;
+      timerDisplay.textContent = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    }
+    if (progressRing) {
+      let totalTime;
+      switch (this.pomodoroMode) {
+        case "work":
+          totalTime = this.plugin.settings.pomodoroWorkTime * 60;
+          break;
+        case "break":
+          totalTime = this.plugin.settings.pomodoroBreakTime * 60;
+          break;
+        case "longBreak":
+          totalTime = this.plugin.settings.pomodoroLongBreakTime * 60;
+          break;
+      }
+      const progress = (totalTime - this.pomodoroTimeLeft) / totalTime;
+      const circumference = 2 * Math.PI * 90;
+      const strokeDashoffset = circumference - progress * circumference;
+      progressRing.style.strokeDasharray = `${circumference} ${circumference}`;
+      progressRing.style.strokeDashoffset = strokeDashoffset.toString();
+    }
+    this.updateStatsDisplay();
+  }
+  updateStartPauseButton() {
+    const startPauseBtn = this.containerEl.querySelector("#startPauseBtn");
+    const startPauseIcon = this.containerEl.querySelector("#startPauseIcon");
+    const startPauseText = this.containerEl.querySelector("#startPauseText");
+    const isRomanian = this.plugin.settings.language === "ro";
+    if (startPauseBtn && startPauseIcon && startPauseText) {
+      if (this.pomodoroIsRunning) {
+        startPauseIcon.textContent = "\u23F8\uFE0F";
+        startPauseText.textContent = isRomanian ? "Pauz\u0103" : "Pause";
+        startPauseBtn.classList.add("running");
+      } else {
+        startPauseIcon.textContent = "\u25B6\uFE0F";
+        startPauseText.textContent = isRomanian ? "\xCEnceput" : "Start";
+        startPauseBtn.classList.remove("running");
+      }
+    }
+  }
+  updatePomodoroModeDisplay() {
+    const pomodoroMode = this.containerEl.querySelector("#pomodoroMode");
+    const isRomanian = this.plugin.settings.language === "ro";
+    if (pomodoroMode) {
+      switch (this.pomodoroMode) {
+        case "work":
+          pomodoroMode.textContent = isRomanian ? "Timp de lucru" : "Work Time";
+          pomodoroMode.className = "pomodoro-mode work";
+          break;
+        case "break":
+          pomodoroMode.textContent = isRomanian ? "Pauz\u0103 scurt\u0103" : "Short Break";
+          pomodoroMode.className = "pomodoro-mode break";
+          break;
+        case "longBreak":
+          pomodoroMode.textContent = isRomanian ? "Pauz\u0103 lung\u0103" : "Long Break";
+          pomodoroMode.className = "pomodoro-mode long-break";
+          break;
+      }
+    }
+  }
+  updateStatsDisplay() {
+    const completedSessionsEl = this.containerEl.querySelector("#completedSessions");
+    const currentCycleEl = this.containerEl.querySelector("#currentCycle");
+    if (completedSessionsEl) {
+      completedSessionsEl.textContent = this.pomodoroCompletedSessions.toString();
+    }
+    if (currentCycleEl) {
+      currentCycleEl.textContent = this.pomodoroCurrentCycle.toString();
+    }
+  }
 };
 var RelaxingTodoSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -852,6 +1851,31 @@ var RelaxingTodoSettingTab = class extends import_obsidian.PluginSettingTab {
     }));
     new import_obsidian.Setting(containerEl).setName(isRomanian ? "Auto-\u0219terge expirate" : "Auto-delete Expired").setDesc(isRomanian ? "\u0218terge automat reminder-urile expirate" : "Automatically delete expired reminders").addToggle((toggle) => toggle.setValue(this.plugin.settings.autoDeleteExpired).onChange(async (value) => {
       this.plugin.settings.autoDeleteExpired = value;
+      await this.plugin.saveSettings();
+    }));
+    containerEl.createEl("h3", { text: isRomanian ? "\u{1F345} Set\u0103ri Pomodoro" : "\u{1F345} Pomodoro Settings" });
+    new import_obsidian.Setting(containerEl).setName(isRomanian ? "Timp de lucru (minute)" : "Work Time (minutes)").setDesc(isRomanian ? "Durata unei sesiuni de lucru" : "Duration of a work session").addSlider((slider) => slider.setLimits(1, 60, 1).setValue(this.plugin.settings.pomodoroWorkTime).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.pomodoroWorkTime = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName(isRomanian ? "Pauz\u0103 scurt\u0103 (minute)" : "Short Break (minutes)").setDesc(isRomanian ? "Durata unei pauze scurte" : "Duration of a short break").addSlider((slider) => slider.setLimits(1, 30, 1).setValue(this.plugin.settings.pomodoroBreakTime).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.pomodoroBreakTime = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName(isRomanian ? "Pauz\u0103 lung\u0103 (minute)" : "Long Break (minutes)").setDesc(isRomanian ? "Durata unei pauze lungi" : "Duration of a long break").addSlider((slider) => slider.setLimits(5, 60, 1).setValue(this.plugin.settings.pomodoroLongBreakTime).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.pomodoroLongBreakTime = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName(isRomanian ? "Sesiuni p\xE2n\u0103 la pauza lung\u0103" : "Sessions Before Long Break").setDesc(isRomanian ? "Num\u0103rul de sesiuni de lucru \xEEnainte de o pauz\u0103 lung\u0103" : "Number of work sessions before a long break").addSlider((slider) => slider.setLimits(2, 8, 1).setValue(this.plugin.settings.pomodoroSessionsBeforeLongBreak).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.pomodoroSessionsBeforeLongBreak = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName(isRomanian ? "Auto-\xEEncepe pauzele" : "Auto-start Breaks").setDesc(isRomanian ? "\xCEncepe automat pauzele dup\u0103 sesiunile de lucru" : "Automatically start breaks after work sessions").addToggle((toggle) => toggle.setValue(this.plugin.settings.pomodoroAutoStartBreaks).onChange(async (value) => {
+      this.plugin.settings.pomodoroAutoStartBreaks = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName(isRomanian ? "Auto-\xEEncepe lucrul" : "Auto-start Work").setDesc(isRomanian ? "\xCEncepe automat sesiunile de lucru dup\u0103 pauze" : "Automatically start work sessions after breaks").addToggle((toggle) => toggle.setValue(this.plugin.settings.pomodoroAutoStartWork).onChange(async (value) => {
+      this.plugin.settings.pomodoroAutoStartWork = value;
       await this.plugin.saveSettings();
     }));
   }

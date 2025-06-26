@@ -1,138 +1,248 @@
-# MindfulDo - Obsidian Plugin v1.1.0
+# MindfulDo - Obsidian Plugin
 
-![Image](https://github.com/user-attachments/assets/b9b1e7cc-7ed8-4154-a5d5-c298ad3e9658)
+*MindfulDo • Do mindfully*
 
-MindfulDo is a beautiful, responsive task and reminder management plugin for Obsidian that helps you organize your daily activities mindfully and efficiently.
+A calm, beautiful, and feature-rich todo list for Obsidian that helps you stay organized without stress.
+
+![Plugin Preview](https://img.shields.io/badge/Obsidian-Plugin-purple) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-1.0.0-blue)
 
 ## ✨ Features
 
-### 🎯 Task Management
-- **Smart Categories**: Work, Personal, Health, Learning, and Hobby
-- **Instant Task Toggle**: Quick completion with immediate visual feedback
-- **Smart Sorting**: Completed tasks automatically move to the bottom
-- **Task Deletion**: Clean up your workspace easily
-- **Bulk Operations**: Clear all completed tasks at once
+### 📝 **Task Management**
+- **Categorized tasks** with 6 pre-defined categories (Work, Personal, Health, Learning, Hobby)
+- **Real-time task counting** with completion tracking
+- **Smooth animations** for a relaxing user experience
+- **Enhanced local storage** - all data stays in your Obsidian vault with improved persistence
+- **Complete timestamps** - track when tasks were created and completed
 
-### ⏰ Reminder System
-- **Smart Notifications**: Set date and time-based reminders
-- **Flexible Scheduling**: Support for future dates and times
-- **Visual Indicators**: Clear expired vs active reminder status
-- **Auto-cleanup**: Optional automatic deletion of expired reminders
-- **Persistent Storage**: Reminders survive Obsidian restarts
+### ⏰ **Smart Reminders**
+- **Intuitive date/time picker** with separate inputs for better UX
+- **Browser notifications** with custom icons
+- **Flexible expiration handling**:
+  - Keep expired reminders until manually deleted
+  - Auto-delete reminders when they expire
+- **Persistent across sessions** - reminders survive Obsidian restarts
 
-### 📅 Calendar View
-- **Monthly Overview**: Beautiful calendar interface
-- **Task & Reminder Indicators**: Visual dots show daily activity
-- **Quick Navigation**: Previous/next month controls
-- **Day Details**: Click any date to see tasks and reminders
-- **Responsive Design**: Adapts to different sidebar widths
+### 📅 **Visual Calendar**
+- **Monthly view** with intuitive navigation
+- **Visual indicators for tasks and reminders**:
+  - Green dots for tasks created on that day
+  - Orange dots for scheduled reminders
+- **Clear legend** for quick identification
+- **Responsive design** that adapts to sidebar width
+- **Interactive day details** - click on days with events to see details below
 
-### 🎨 Beautiful Themes
-- **Ocean**: Calming blue-teal gradient
-- **Forest**: Natural green tones
-- **Sunset**: Warm pink-orange gradient
-- **Purple**: Rich violet aesthetics
-- **Midnight**: Deep blue atmosphere
-- **Default**: Clean, professional look
+### 🔄 **Habit Tracker**
+- **Visual habit tracking** with beautiful, interactive interface
+- **Customizable habits** with 6 color options for personalization
+- **7-day tracking view** showing the last week's progress at a glance
+- **Streak system**:
+  - Current streak tracking for motivation
+  - Best streak recording for personal records
+  - Automatic streak calculation and updates
+- **Interactive daily marking**:
+  - Click on any day circle to mark/unmark completion
+  - Today's indicator with special highlighting
+  - Visual feedback for completed vs. missed days
+- **Persistent data** - all habit completions saved locally in your vault
+- **Responsive design** adapting to all screen sizes and themes
 
-### 🌍 Multi-Language Support
-- **English**: Full interface translation
-- **Romanian**: Complete localization with formal language
-- **Smart Greetings**: Time-aware welcome messages
-- **Professional Interface**: Clean, consistent terminology
+### 🍅 **Pomodoro Timer**
+- **Professional productivity timer** with circular progress visualization
+- **Configurable time periods**:
+  - Work sessions (1-60 minutes, default: 25 min)
+  - Short breaks (1-30 minutes, default: 5 min) 
+  - Long breaks (5-60 minutes, default: 15 min)
+- **Smart session management**:
+  - Automatic cycle progression (work → break → work)
+  - Configurable sessions before long break (2-8, default: 4)
+  - Session and cycle tracking with real-time statistics
+- **Enhanced user experience**:
+  - Beautiful circular timer with animated progress ring
+  - Start/pause/reset/skip controls with visual feedback
+  - Audio-less notifications respecting Obsidian's notification system
+  - Auto-start options for breaks and work sessions
+- **Quick settings** within the timer view for immediate adjustments
+- **Theme integration** - timer colors adapt to all 6 available themes
 
-### 📱 Responsive Design
-- **Mobile-Friendly**: Works on all screen sizes
-- **Sidebar Adaptive**: Optimizes for narrow sidebars
-- **Touch-Friendly**: Large, accessible buttons
-- **Flexible Layout**: Components adapt to available space
+### 🎨 **Beautiful Themes**
+Choose from 6 carefully crafted color schemes:
+- 🎨 **Default** - Clean and energizing theme
+- 🌊 **Ocean** (Blue-Teal) - Calming water vibes
+- 🌲 **Forest** (Green) - Natural and refreshing
+- 🌸 **Sunset** (Pink-Orange) - Gentle evening colors
+- 💜 **Purple** (Violet) - Creative and inspiring
+- 🌙 **Midnight** (Dark Blue) - Focused night mode
 
-## 🚀 What's New in v1.1.0
+### 🌍 **Multi-language Support**
+- **Full Romanian support** - Native language experience
+- **Complete English support** - International accessibility
+- **Smart greetings** - Auto-detects appropriate greetings and placeholders
+- **Instant switching** - Change language in settings with immediate effect
 
-### 🔧 Major Improvements
-- **Fixed Category Filtering**: All categories now work perfectly with demo data
-- **Unified Category System**: Streamlined English category names (work, health, learning)
-- **Instant Task Animation**: Removed delays for immediate task reordering
-- **Clean Interface**: Eliminated empty state messages that overlapped buttons
-- **Better Tag Display**: All category tags now show proper colors
-- **Calendar Integration**: Fixed task/reminder display in calendar view
+### ⚙️ **Customizable Settings**
+- **Personal greetings** - Set your name for personalized daily greetings
+- **Theme selection** - Pick your favorite color scheme
+- **Language preference** - Choose between Romanian and English
+- **Reminder behavior** - Configure how expired reminders are handled
+- **Sidebar position** - Choose left or right sidebar placement
+- **Scroll control** - Set visible items before scrolling appears
 
-### 🎯 Enhanced Functionality
-- **Sidebar Position Control**: Switch between left and right sidebar placement
-- **Responsive Calendar**: Adapts to narrow windows with stacked navigation
-- **Improved Date Handling**: Better timezone and local date management
-- **Romanian Localization**: Formal language throughout interface
-- **Theme Consistency**: All themes work perfectly across all components
+## 🚀 Installation
 
-## 📦 Installation
+### Method 1: Manual Installation
 
-### Manual Installation
-1. Download the latest release files
-2. Extract `main.js`, `styles.css`, and `manifest.json` to your vault's plugins folder:
+1. **Download the plugin files**:
+   - `main.js`
+   - `manifest.json` 
+   - `styles.css`
+
+2. **Create plugin folder**:
    ```
-   VaultFolder/.obsidian/plugins/mindfuldo-vlad/
+   YourVault/.obsidian/plugins/mindfuldo-vlad/
    ```
-3. Enable the plugin in Obsidian Settings → Community Plugins
 
-### From Obsidian Community Plugins
-*Coming soon to the official Obsidian plugin directory*
+3. **Copy files** into the plugin folder
+
+4. **Enable in Obsidian**:
+   - Go to Settings → Community Plugins
+   - Find "MindfulDo" and toggle it on
+
+### Method 2: BRAT (Beta)
+
+1. Install BRAT plugin if you haven't already
+2. Add this repository URL in BRAT settings
+3. Enable the plugin in Community Plugins
+
+## 🎯 Usage
+
+### Getting Started
+1. **Open the plugin** by clicking the checkmark icon in the sidebar
+2. **Set your preferences** in Settings → MindfulDo Settings
+3. **Start adding tasks** with the intuitive interface
+
+### Adding Tasks
+- Type your task in the input field
+- Press Enter or click "Add"
+- Tasks automatically categorize based on your current filter
+- Click the checkbox to mark as complete
+
+### Setting Reminders
+- Enter reminder description
+- Pick date from calendar picker
+- Choose time with time picker
+- Click "Add Reminder"
+
+### Using the Habit Tracker
+- Access the habit tracker through the "🔄 Obiceiuri" tab (or "🔄 Habits" in English)
+- **Add a new habit**: 
+  - Type the habit name (e.g., "Drink water", "Read", "Exercise")
+  - Choose a color from the 6 available options
+  - Click "Add" to create the habit
+- **Track daily progress**:
+  - See the last 7 days displayed as circles for each habit
+  - Click on any day circle to mark it as completed (✓) or uncompleted
+  - Today's circle is highlighted with a special border
+  - Completed days show in the habit's chosen color
+- **Monitor your streaks**:
+  - Current streak shows consecutive days completed
+  - Best streak displays your personal record
+  - Streaks update automatically as you mark days
+
+### Using the Calendar
+- Navigate through months using header arrows
+- Days with tasks show green indicators
+- Days with reminders show orange indicators
+- Current day is highlighted
+- **Click on days with events** to view task and reminder details below the calendar
+
+### Using the Pomodoro Timer
+- Access timer through the "🍅 Pomodoro" tab
+- **Start a session**: Click the play button to begin a work session
+- **Pause/resume**: Click the pause button to temporarily stop the timer
+- **Reset**: Click reset to return to the original time for current mode
+- **Skip**: Jump to the next session (work/break) immediately
+- **Watch your progress**: The circular ring fills as time progresses
+- **Track statistics**: View completed sessions and current cycle number
+- **Quick adjustments**: Change time periods directly in the timer view
+- **Notifications**: Get notified when sessions complete (if notifications enabled)
+
+### Themes
+- Access theme settings through plugin settings
+- Changes apply instantly across all open views
+- Each theme provides coordinated colors for all UI elements
 
 ## ⚙️ Configuration
 
-Access plugin settings through: **Settings → Community Plugins → MindfulDo**
+### Settings Options
 
-### Available Options
-- **Default Category**: Choose default category for new tasks
-- **Language**: Switch between English and Romanian
-- **Theme**: Select from 6 beautiful themes
-- **Sidebar Position**: Left or right sidebar placement
-- **Notifications**: Enable/disable reminder notifications
-- **Auto-delete Expired**: Automatically remove old reminders
+| Setting | Description |
+|---|---|
+| **Your name** | Personalizes greetings throughout the day |
+| **Language** | Choose between English and Romanian |
+| **Color theme** | Select from 6 beautiful themes |
+| **Expired reminders** | Keep until deleted or auto-delete |
+| **Sidebar position** | Choose left or right sidebar |
+| **Visible tasks/reminders** | Control scroll behavior |
+| **Work Time** | Duration of Pomodoro work sessions (1-60 min) |
+| **Short Break** | Duration of short breaks (1-30 min) |
+| **Long Break** | Duration of long breaks (5-60 min) |
+| **Sessions Before Long Break** | Number of work sessions before a long break (2-8) |
+| **Auto-start Breaks** | Automatically start breaks after work sessions |
+| **Auto-start Work** | Automatically start work after breaks |
 
-## 📱 Usage
+## 🆕 What's New in v1.0.0
 
-### Adding Tasks
-1. Type your task in the input field
-2. Select a category or use the default
-3. Press Enter or click Add
-4. Tasks automatically sort with incomplete items first
+### Enhanced Persistence
+- **Fixed persistence issues** - Tasks and reminders now save correctly and survive restarts
+- **Complete timestamps** - Track when items were created and completed
+- **Improved synchronization** - Data saves automatically on every change
 
-### Setting Reminders
-1. Switch to Reminders tab
-2. Enter reminder text
-3. Set date and time
-4. Click "Add Reminder"
-5. Get notified when the time comes
+### Visual Calendar
+- **Brand new calendar view** with month navigation
+- **Visual indicators** for tasks (green) and reminders (orange)
+- **Interactive day details** - click on days to see tasks and reminders below
+- **Responsive design** that adapts to sidebar dimensions
+- **Intuitive legend** for quick identification
 
-### Calendar Navigation
-1. Click Calendar tab for monthly view
-2. Use ← → arrows to navigate months
-3. Click any date to see details
-4. Visual indicators show task/reminder count per day
+### Extended Multilingual Support
+- **Complete localization** for Romanian and English
+- **Dynamic greetings** based on time of day and selected language
+- **Smart placeholders** that adapt to context
+- **Consistent interface** in both languages
 
-### Theme Customization
-1. Go to Settings → MindfulDo
-2. Choose from 6 beautiful themes
-3. Changes apply immediately
-4. Each theme includes light/dark mode support
-
-## 🌟 Key Improvements from v1.0.0
-
-- ✅ **Perfect Category Filtering**: All buttons now work with demo data
-- ✅ **Instant Performance**: Removed artificial delays
-- ✅ **Clean Interface**: No more overlapping empty state messages
-- ✅ **Professional Demo**: Realistic data for immediate productivity
-- ✅ **Better Calendar**: Fixed task/reminder display issues
-- ✅ **Enhanced Responsive Design**: Better mobile and narrow sidebar support
-- ✅ **Improved Localization**: Professional Romanian translation
+### Improved Calendar Navigation
+- **Fixed navigation bugs** - smooth month transitions without random jumps
+- **Prevented Obsidian freezing** - optimized event listeners and rendering
+- **Stable performance** - eliminated rapid-click issues
 
 ## 🤝 Contributing
 
-We welcome contributions! Please feel free to:
-- Report bugs via GitHub Issues
-- Suggest new features
-- Submit pull requests
-- Share feedback and usage stories
+We welcome contributions from the community!
+
+### How to Contribute
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Test thoroughly
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+### Areas for Contribution
+- 🌍 **Translations** - Add support for more languages
+- 🎨 **Themes** - Create new color schemes
+- 🚀 **Features** - Implement new functionality
+- 🐛 **Bug Fixes** - Report and fix issues
+- 📖 **Documentation** - Improve guides and examples
+
+## 🐛 Issues
+
+Found a bug or have a feature request? Please [open an issue](https://github.com/Vlad3Design/MindfulDo/issues) with:
+- Clear description of the problem or feature
+- Steps to reproduce (for bugs)
+- Expected vs actual behavior
+- Screenshots if applicable
 
 ## 📄 License
 
@@ -140,12 +250,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Built with ❤️ for the Obsidian community
-- Inspired by mindful productivity principles
-- Designed for daily use and long-term organization
+- Obsidian community for inspiration and feedback
+- All beta testers and contributors
+- Everyone who believes in mindful, stress-free productivity
 
 ---
 
-**Made with 🎯 by Vlad 3Design**
+**Made with ❤️ by [Vlad | 3Design](https://github.com/Vlad3Design)**
 
-[GitHub Repository](https://github.com/vladdesign/mindfuldo-obsidian) | [Report Issues](https://github.com/vladdesign/mindfuldo-obsidian/issues) | [Feature Requests](https://github.com/vladdesign/mindfuldo-obsidian/discussions) 
+*Stay organized, stay mindful.* 
