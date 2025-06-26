@@ -1,10 +1,12 @@
+![MindfulDo v1.2.0](https://github.com/Vlad3Design/MindfulDo/blob/main/Banner-MindfulDo%20v1_2_0.jpg)
+
 # MindfulDo - Obsidian Plugin
 
 *MindfulDo • Do mindfully*
 
 A calm, beautiful, and feature-rich todo list for Obsidian that helps you stay organized without stress.
 
-![Plugin Preview](https://img.shields.io/badge/Obsidian-Plugin-purple) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+![Plugin Preview](https://img.shields.io/badge/Obsidian-Plugin-purple) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-1.2.0-blue)
 
 ## ✨ Features
 
@@ -79,6 +81,8 @@ Choose from 6 carefully crafted color schemes:
 - **Complete English support** - International accessibility
 - **Smart greetings** - Auto-detects appropriate greetings and placeholders
 - **Instant switching** - Change language in settings with immediate effect
+
+![MindfulDo Features](https://github.com/Vlad3Design/MindfulDo/blob/main/Banner-MindfulDo%20v2%20-%20FEATURES.jpg)
 
 ### ⚙️ **Customizable Settings**
 - **Personal greetings** - Set your name for personalized daily greetings
