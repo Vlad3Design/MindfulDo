@@ -103,7 +103,7 @@ Choose from 6 carefully crafted color schemes:
 
 2. **Create plugin folder**:
    ```
-   YourVault/.obsidian/plugins/mindfuldo-vlad/
+   YourVault/.obsidian/plugins/mindfuldo/
    ```
 
 3. **Copy files** into the plugin folder
