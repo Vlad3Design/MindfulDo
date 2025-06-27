@@ -5,6 +5,24 @@ All notable changes to the MindfulDo plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-06-27
+
+### Fixed
+- **Mobile-Desktop Sync Bug** - Solved the synchronization issue for habits between mobile and desktop versions
+  - Added automatic file monitoring to detect external data changes
+  - Implemented real-time view updates when habits are modified on other devices
+  - Added periodic sync check as fallback (every 5 seconds)
+  - Included debouncing to optimize performance and prevent excessive reloads
+  - No longer requires plugin restart to see changes from other devices
+
+## [1.2.1] - 2025-06-27
+  - Responsive Habit Tracker Layout
+  - Habit tracking days now use a responsive grid:
+  - Days are always displayed as round circles with a green border
+  - Automatically arrange on two rows if the container is too narrow (works on mobile and narrow sidebars)
+  - Preserves the original look and feel, with improved usability on all screen sizes
+  - No more overflow or selection issues on mobile or small sidebars
+
 ## [1.2.0] - 2025-06-26
 
 ### Added
@@ -37,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - More intuitive habits score calculation
   - Better visual representation of productivity metrics
   - Added color legend for daily activity chart
+- **Responsive Habit Tracker Layout** - Habit tracking days now use a responsive grid:
+  - Days are always displayed as round circles with a green border
+  - Automatically arrange on two rows if the container is too narrow (works on mobile and narrow sidebars)
+  - Preserves the original look and feel, with improved usability on all screen sizes
+  - No more overflow or selection issues on mobile or small sidebars
 
 ### Fixed
 - **Data Persistence** - Enhanced reliability of data saving
