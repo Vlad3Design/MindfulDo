@@ -48,11 +48,28 @@ var DEFAULT_SETTINGS = {
 };
 var VIEW_TYPE_RELAXING_TODO = "relaxing-todo-view";
 var RelaxingTodoPlugin = class extends import_obsidian.Plugin {
+  constructor() {
+    super(...arguments);
+    this.lastDataUpdate = 0;
+  }
   async onload() {
     await this.loadSettings();
+    this.dataFilePath = this.app.vault.configDir + "/plugins/mindfuldo/data.json";
     this.registerView(
       VIEW_TYPE_RELAXING_TODO,
       (leaf) => new RelaxingTodoView(leaf, this)
+    );
+    this.registerEvent(
+      this.app.vault.on("modify", (file) => {
+        if (file.path.includes("mindfuldo") || file.path.includes("data.json")) {
+          this.handleDataFileChange();
+        }
+      })
+    );
+    this.registerInterval(
+      window.setInterval(() => {
+        this.checkForDataChanges();
+      }, 5e3)
     );
     const ribbonIconEl = this.addRibbonIcon("checkmark", "MindfulDo - Task Manager", (evt) => {
       this.activateView();
@@ -120,6 +137,28 @@ var RelaxingTodoPlugin = class extends import_obsidian.Plugin {
       }
     });
   }
+  async handleDataFileChange() {
+    const now = Date.now();
+    if (now - this.lastDataUpdate < 1e3) {
+      return;
+    }
+    this.lastDataUpdate = now;
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_RELAXING_TODO);
+    leaves.forEach((leaf) => {
+      if (leaf.view instanceof RelaxingTodoView) {
+        leaf.view.syncWithExternalChanges();
+      }
+    });
+  }
+  async checkForDataChanges() {
+    try {
+      const stat = await this.app.vault.adapter.stat(this.dataFilePath);
+      if (stat && stat.mtime > this.lastDataUpdate) {
+        this.handleDataFileChange();
+      }
+    } catch (error) {
+    }
+  }
 };
 var RelaxingTodoView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
@@ -181,6 +220,33 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     this.createInterface(container);
     this.updateDateTime();
     this.renderCurrentView();
+  }
+  async syncWithExternalChanges() {
+    try {
+      await this.loadData();
+      switch (this.currentView) {
+        case "habits":
+          this.renderHabits();
+          break;
+        case "tasks":
+          this.renderTasks();
+          break;
+        case "reminders":
+          this.renderReminders();
+          break;
+        case "analytics":
+          this.renderAnalytics();
+          break;
+        case "calendar":
+          this.renderCalendar();
+          break;
+        case "pomodoro":
+          this.renderPomodoro();
+          break;
+      }
+    } catch (error) {
+      console.log("MindfulDo: Error syncing external changes:", error);
+    }
   }
   createInterface(container) {
     container.innerHTML = `
