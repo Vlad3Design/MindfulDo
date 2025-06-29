@@ -2715,7 +2715,7 @@
     stroke: var(--interactive-accent);
     stroke-width: 8;
     stroke-linecap: round;
-    transition: stroke-dashoffset 1s ease;
+    transition: stroke-dashoffset 0.5s ease;
     stroke-dasharray: 565.48 565.48;
     stroke-dashoffset: 565.48;
 }
@@ -3742,4 +3742,245 @@
   .mindfuldo-content .habit-day-label {
     font-size: 9px;
   }
+}
+
+/* Edit Modal Styles */
+.mindfuldo-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.edit-modal-content {
+  background: var(--background-primary);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--background-modifier-border);
+  animation: slideIn 0.3s ease-out;
+}
+
+.edit-modal-content h3 {
+  margin: 0 0 20px 0;
+  color: var(--text-normal);
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+.color-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+  border-color: var(--text-muted);
+}
+
+.color-option.active {
+  border-color: var(--text-normal);
+  transform: scale(1.1);
+}
+
+.color-option.active::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.save-btn,
+.cancel-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.save-btn {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.save-btn:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.cancel-btn {
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.cancel-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Task Actions */
+.task-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.task-edit,
+.habit-edit,
+.reminder-edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.task-edit:hover,
+.habit-edit:hover,
+.reminder-edit:hover {
+  background: var(--background-modifier-hover);
+  opacity: 1;
+}
+
+.habit-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.reminder-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Fix for habit blinking - prevent rapid re-renders */
+.habit-item {
+  transition: none !important;
+}
+
+.habit-day {
+  transition: all 0.2s ease !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive adjustments for edit modals */
+@media (max-width: 480px) {
+  .edit-modal-content {
+    padding: 20px;
+    width: 95%;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .color-options {
+    justify-content: center;
+  }
+}
+
+.form-group select {
+  width: 100%;
+  min-width: 180px;
+  box-sizing: border-box;
+  font-size: 16px;
+  height: 40px;
+  overflow: visible;
+  white-space: normal;
 }
