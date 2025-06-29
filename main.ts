@@ -15,6 +15,13 @@ interface RelaxingTodoSettings {
 	pomodoroSessionsBeforeLongBreak: number;
 	pomodoroAutoStartBreaks: boolean;
 	pomodoroAutoStartWork: boolean;
+	// Feature Toggles
+	enableTasks: boolean;
+	enableReminders: boolean;
+	enableHabits: boolean;
+	enableAnalytics: boolean;
+	enableCalendar: boolean;
+	enablePomodoro: boolean;
 }
 
 const DEFAULT_SETTINGS: RelaxingTodoSettings = {
@@ -31,7 +38,14 @@ const DEFAULT_SETTINGS: RelaxingTodoSettings = {
 	pomodoroLongBreakTime: 15,
 	pomodoroSessionsBeforeLongBreak: 4,
 	pomodoroAutoStartBreaks: false,
-	pomodoroAutoStartWork: false
+	pomodoroAutoStartWork: false,
+	// Feature Toggles
+	enableTasks: true,
+	enableReminders: true,
+	enableHabits: true,
+	enableAnalytics: true,
+	enableCalendar: true,
+	enablePomodoro: true
 }
 
 interface Task {
@@ -348,25 +362,8 @@ export class RelaxingTodoView extends ItemView {
 				</div>
 
 				<!-- Navigation Tabs -->
-				<div class="navigation-tabs">
-					<button class="nav-tab active nav-tab-tasks" data-view="tasks">
-						<span>📝</span> ${this.plugin.settings.language === 'ro' ? 'Sarcini' : 'Tasks'}
-					</button>
-					<button class="nav-tab nav-tab-reminders" data-view="reminders">
-						<span>⏰</span> ${this.plugin.settings.language === 'ro' ? 'Amintiri' : 'Reminders'}
-					</button>
-					<button class="nav-tab nav-tab-habits" data-view="habits">
-						<span>🔄</span> ${this.plugin.settings.language === 'ro' ? 'Obiceiuri' : 'Habits'}
-					</button>
-					<button class="nav-tab nav-tab-analytics" data-view="analytics">
-						<span>📊</span> Analytics
-					</button>
-					<button class="nav-tab nav-tab-calendar" data-view="calendar">
-						<span>📅</span> ${this.plugin.settings.language === 'ro' ? 'Calendar' : 'Calendar'}
-					</button>
-					<button class="nav-tab nav-tab-pomodoro" data-view="pomodoro">
-						<span>🍅</span> Pomodoro
-					</button>
+				<div class="navigation-tabs" id="navigationTabs">
+					${this.generateNavigationTabs()}
 				</div>
 
 				<!-- Tasks View -->
@@ -701,6 +698,137 @@ export class RelaxingTodoView extends ItemView {
 		this.renderCurrentView();
 	}
 
+	private generateNavigationTabs(): string {
+		const isRomanian = this.plugin.settings.language === 'ro';
+		const tabs: string[] = [];
+		let firstTab = true;
+
+		// Count enabled tabs for dynamic grid
+		const enabledTabs = [
+			this.plugin.settings.enableTasks,
+			this.plugin.settings.enableReminders,
+			this.plugin.settings.enableHabits,
+			this.plugin.settings.enableAnalytics,
+			this.plugin.settings.enableCalendar,
+			this.plugin.settings.enablePomodoro
+		].filter(Boolean).length;
+
+		// Tasks tab
+		if (this.plugin.settings.enableTasks) {
+			tabs.push(`
+				<button class="nav-tab ${firstTab ? 'active' : ''} nav-tab-tasks" data-view="tasks">
+					<span>📝</span> ${isRomanian ? 'Sarcini' : 'Tasks'}
+				</button>
+			`);
+			if (firstTab) firstTab = false;
+		}
+
+		// Reminders tab
+		if (this.plugin.settings.enableReminders) {
+			tabs.push(`
+				<button class="nav-tab ${firstTab ? 'active' : ''} nav-tab-reminders" data-view="reminders">
+					<span>⏰</span> ${isRomanian ? 'Amintiri' : 'Reminders'}
+				</button>
+			`);
+			if (firstTab) firstTab = false;
+		}
+
+		// Habits tab
+		if (this.plugin.settings.enableHabits) {
+			tabs.push(`
+				<button class="nav-tab ${firstTab ? 'active' : ''} nav-tab-habits" data-view="habits">
+					<span>🔄</span> ${isRomanian ? 'Obiceiuri' : 'Habits'}
+				</button>
+			`);
+			if (firstTab) firstTab = false;
+		}
+
+		// Analytics tab
+		if (this.plugin.settings.enableAnalytics) {
+			tabs.push(`
+				<button class="nav-tab ${firstTab ? 'active' : ''} nav-tab-analytics" data-view="analytics">
+					<span>📊</span> Analytics
+				</button>
+			`);
+			if (firstTab) firstTab = false;
+		}
+
+		// Calendar tab
+		if (this.plugin.settings.enableCalendar) {
+			tabs.push(`
+				<button class="nav-tab ${firstTab ? 'active' : ''} nav-tab-calendar" data-view="calendar">
+					<span>📅</span> ${isRomanian ? 'Calendar' : 'Calendar'}
+				</button>
+			`);
+			if (firstTab) firstTab = false;
+		}
+
+		// Pomodoro tab
+		if (this.plugin.settings.enablePomodoro) {
+			tabs.push(`
+				<button class="nav-tab ${firstTab ? 'active' : ''} nav-tab-pomodoro" data-view="pomodoro">
+					<span>🍅</span> Pomodoro
+				</button>
+			`);
+			if (firstTab) firstTab = false;
+		}
+
+		// If no tabs are enabled, default to tasks
+		if (tabs.length === 0) {
+			tabs.push(`
+				<button class="nav-tab active nav-tab-tasks" data-view="tasks">
+					<span>📝</span> ${isRomanian ? 'Sarcini' : 'Tasks'}
+				</button>
+			`);
+		}
+
+		// Generate dynamic grid CSS based on number of enabled tabs
+		const gridCSS = this.generateDynamicGridCSS(enabledTabs);
+
+		return `
+			<style id="dynamic-nav-grid">
+				${gridCSS}
+			</style>
+			${tabs.join('')}
+		`;
+	}
+
+	private generateDynamicGridCSS(enabledTabs: number): string {
+		if (enabledTabs <= 3) {
+			return `
+				.mindfuldo-content .navigation-tabs {
+					grid-template-columns: repeat(${enabledTabs}, 1fr);
+					grid-template-rows: 1fr;
+				}
+			`;
+		} else if (enabledTabs === 4) {
+			return `
+				.mindfuldo-content .navigation-tabs {
+					grid-template-columns: repeat(2, 1fr);
+					grid-template-rows: repeat(2, 1fr);
+				}
+			`;
+		} else if (enabledTabs === 5) {
+			return `
+				.mindfuldo-content .navigation-tabs {
+					grid-template-columns: repeat(3, 1fr);
+					grid-template-rows: repeat(2, 1fr);
+				}
+				.mindfuldo-content .nav-tab:nth-child(4),
+				.mindfuldo-content .nav-tab:nth-child(5) {
+					grid-column: span 1.5;
+				}
+			`;
+		} else {
+			return `
+				.mindfuldo-content .navigation-tabs {
+					grid-template-columns: repeat(3, 1fr);
+					grid-template-rows: repeat(2, 1fr);
+				}
+			`;
+		}
+	}
+
 	private setupEventListeners() {
 		const addBtn = this.containerEl.querySelector('#addBtn') as HTMLButtonElement;
 		const taskInput = this.containerEl.querySelector('#taskInput') as HTMLInputElement;
@@ -930,15 +1058,135 @@ export class RelaxingTodoView extends ItemView {
 			}
 			this.saveData();
 			
-			// Rerandar instant pentru repoziționare imediată
-			this.renderCurrentView();
+			// Render only the current view to prevent blinking
+			if (this.currentView === 'tasks') {
+				this.renderTasks();
+			}
 		}
 	}
 
 	private deleteTask(id: number) {
 		this.tasks = this.tasks.filter(task => task.id !== id);
 		this.saveData();
-		this.renderCurrentView();
+		this.renderTasks();
+	}
+
+	private editTask(id: number) {
+		const task = this.tasks.find(t => t.id === id);
+		if (!task) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+		
+		// Remove any existing modal first
+		const existingModal = document.querySelector('.mindfuldo-edit-modal');
+		if (existingModal) {
+			document.body.removeChild(existingModal);
+		}
+		
+		// Create edit modal
+		const modal = document.createElement('div');
+		modal.className = 'mindfuldo-edit-modal';
+		modal.innerHTML = `
+			<div class="edit-modal-content">
+				<h3>${isRomanian ? 'Editează sarcina' : 'Edit Task'}</h3>
+				<div class="edit-form">
+					<div class="form-group">
+						<label>${isRomanian ? 'Text:' : 'Text:'}</label>
+						<input type="text" id="editTaskText" value="${task.text}" placeholder="${isRomanian ? 'Introduceți textul sarcinii' : 'Enter task text'}">
+					</div>
+					<div class="form-group">
+						<label>${isRomanian ? 'Categoria:' : 'Category:'}</label>
+						<select id="editTaskCategory">
+							<option value="work" ${task.category === 'work' ? 'selected' : ''}>${this.getCategoryName('work')}</option>
+							<option value="personal" ${task.category === 'personal' ? 'selected' : ''}>${this.getCategoryName('personal')}</option>
+							<option value="health" ${task.category === 'health' ? 'selected' : ''}>${this.getCategoryName('health')}</option>
+							<option value="learning" ${task.category === 'learning' ? 'selected' : ''}>${this.getCategoryName('learning')}</option>
+							<option value="hobby" ${task.category === 'hobby' ? 'selected' : ''}>${this.getCategoryName('hobby')}</option>
+						</select>
+					</div>
+					<div class="form-actions">
+						<button id="saveTaskEdit" class="save-btn">${isRomanian ? 'Salvează' : 'Save'}</button>
+						<button id="cancelTaskEdit" class="cancel-btn">${isRomanian ? 'Anulează' : 'Cancel'}</button>
+					</div>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// Add event listeners
+		const saveBtn = modal.querySelector('#saveTaskEdit');
+		const cancelBtn = modal.querySelector('#cancelTaskEdit');
+		const textInput = modal.querySelector('#editTaskText') as HTMLInputElement;
+		const categorySelect = modal.querySelector('#editTaskCategory') as HTMLSelectElement;
+
+		const closeModal = () => {
+			if (document.body.contains(modal)) {
+				document.body.removeChild(modal);
+			}
+		};
+
+		const saveChanges = async () => {
+			const newText = textInput.value.trim();
+			const newCategory = categorySelect.value;
+
+			if (!newText) {
+				new Notice(isRomanian ? 'Textul nu poate fi gol!' : 'Text cannot be empty!');
+				textInput.focus();
+				return;
+			}
+
+			try {
+				// Update task
+				task.text = newText;
+				task.category = newCategory;
+				
+				// Save data
+				await this.saveData();
+				
+				// Refresh display
+				if (this.currentView === 'tasks') {
+					this.renderTasks();
+				}
+				
+				// Show success message
+				new Notice(isRomanian ? 'Sarcina a fost actualizată!' : 'Task updated successfully!');
+				
+				// Close modal
+				closeModal();
+			} catch (error) {
+				console.error('Error saving task:', error);
+				new Notice(isRomanian ? 'Eroare la salvarea sarcinii!' : 'Error saving task!');
+			}
+		};
+
+		saveBtn?.addEventListener('click', saveChanges);
+		
+		cancelBtn?.addEventListener('click', closeModal);
+
+		// Close on outside click
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) {
+				closeModal();
+			}
+		});
+
+		// Handle Enter key
+		textInput.addEventListener('keypress', (e) => {
+			if (e.key === 'Enter') {
+				saveChanges();
+			}
+		});
+
+		// Handle Escape key
+		modal.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
+		});
+
+		// Focus on text input
+		setTimeout(() => textInput.focus(), 100);
 	}
 
 	private clearCompleted() {
@@ -1047,11 +1295,14 @@ export class RelaxingTodoView extends ItemView {
 		}
 
 		tasksList.innerHTML = filteredTasks.map(task => `
-			<div class="task-item ${task.completed ? 'completed' : ''}">
+			<div class="task-item ${task.completed ? 'completed' : ''}" data-task-id="${task.id}">
 				<div class="task-checkbox ${task.completed ? 'checked' : ''}" data-task-id="${task.id}"></div>
-				<div class="task-text">${task.text}</div>
-				<div class="task-category ${task.category}">${this.getCategoryName(task.category)}</div>
-				<button class="task-delete" data-task-id="${task.id}">×</button>
+				<div class="task-text" data-task-id="${task.id}">${task.text}</div>
+				<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
+				<div class="task-actions">
+					<button class="task-edit" data-task-id="${task.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
+					<button class="task-delete" data-task-id="${task.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
+				</div>
 			</div>
 		`).join('');
 
@@ -1060,6 +1311,13 @@ export class RelaxingTodoView extends ItemView {
 			checkbox.addEventListener('click', (e) => {
 				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
 				this.toggleTask(taskId);
+			});
+		});
+
+		tasksList.querySelectorAll('.task-edit').forEach(editBtn => {
+			editBtn.addEventListener('click', (e) => {
+				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
+				this.editTask(taskId);
 			});
 		});
 
@@ -1260,7 +1518,10 @@ export class RelaxingTodoView extends ItemView {
 						<div class="reminder-time">${dateStr} la ${timeStr}</div>
 						${reminder.expired ? `<div class="time-left expired">${this.plugin.settings.language === 'ro' ? 'Expirat' : 'Expired'}</div>` : ''}
 					</div>
-					<button class="reminder-delete" data-reminder-id="${reminder.id}">×</button>
+					<div class="reminder-actions">
+						<button class="reminder-edit" data-reminder-id="${reminder.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
+						<button class="reminder-delete" data-reminder-id="${reminder.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
+					</div>
 				</div>
 			`;
 		}).join('');
@@ -1272,25 +1533,154 @@ export class RelaxingTodoView extends ItemView {
 				this.deleteReminder(reminderId);
 			});
 		});
+
+		// Adaugă event listeners pentru editare
+		remindersList.querySelectorAll('.reminder-edit').forEach(editBtn => {
+			editBtn.addEventListener('click', (e) => {
+				const reminderId = parseInt((e.target as HTMLElement).getAttribute('data-reminder-id') || '0');
+				this.editReminder(reminderId);
+			});
+		});
+	}
+
+	private editReminder(id: number) {
+		const reminder = this.reminders.find(r => r.id === id);
+		if (!reminder) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+		const reminderDate = new Date(reminder.dateTime);
+		const dateStr = this.getLocalDateString(reminderDate);
+		const timeStr = reminderDate.toTimeString().slice(0, 5);
+		
+		// Remove any existing modal first
+		const existingModal = document.querySelector('.mindfuldo-edit-modal');
+		if (existingModal) {
+			document.body.removeChild(existingModal);
+		}
+		
+		// Create edit modal
+		const modal = document.createElement('div');
+		modal.className = 'mindfuldo-edit-modal';
+		modal.innerHTML = `
+			<div class="edit-modal-content">
+				<h3>${isRomanian ? 'Editează amintirea' : 'Edit Reminder'}</h3>
+				<div class="edit-form">
+					<div class="form-group">
+						<label>${isRomanian ? 'Text:' : 'Text:'}</label>
+						<input type="text" id="editReminderText" value="${reminder.text}" placeholder="${isRomanian ? 'Introduceți textul amintirii' : 'Enter reminder text'}">
+					</div>
+					<div class="form-group">
+						<label>${isRomanian ? 'Data:' : 'Date:'}</label>
+						<input type="date" id="editReminderDate" value="${dateStr}">
+					</div>
+					<div class="form-group">
+						<label>${isRomanian ? 'Ora:' : 'Time:'}</label>
+						<input type="time" id="editReminderTime" value="${timeStr}">
+					</div>
+					<div class="form-actions">
+						<button id="saveReminderEdit" class="save-btn">${isRomanian ? 'Salvează' : 'Save'}</button>
+						<button id="cancelReminderEdit" class="cancel-btn">${isRomanian ? 'Anulează' : 'Cancel'}</button>
+					</div>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// Add event listeners
+		const saveBtn = modal.querySelector('#saveReminderEdit');
+		const cancelBtn = modal.querySelector('#cancelReminderEdit');
+		const textInput = modal.querySelector('#editReminderText') as HTMLInputElement;
+		const dateInput = modal.querySelector('#editReminderDate') as HTMLInputElement;
+		const timeInput = modal.querySelector('#editReminderTime') as HTMLInputElement;
+
+		const closeModal = () => {
+			if (document.body.contains(modal)) {
+				document.body.removeChild(modal);
+			}
+		};
+
+		const saveChanges = async () => {
+			const newText = textInput.value.trim();
+			const newDate = dateInput.value;
+			const newTime = timeInput.value;
+
+			if (!newText || !newDate || !newTime) {
+				new Notice(isRomanian ? 'Completați toate câmpurile!' : 'Fill in all fields!');
+				return;
+			}
+
+			const newDateTime = `${newDate}T${newTime}`;
+			const newReminderDate = new Date(newDateTime);
+			
+			if (newReminderDate <= new Date()) {
+				new Notice(isRomanian ? 'Vă rugăm să alegeți o dată și oră din viitor!' : 'Date must be in the future!');
+				return;
+			}
+
+			try {
+				// Update reminder
+				reminder.text = newText;
+				reminder.dateTime = newDateTime;
+				reminder.expired = false; // Reset expired status
+				
+				// Save data
+				await this.saveData();
+				
+				// Refresh display
+				if (this.currentView === 'reminders') {
+					this.renderReminders();
+				}
+				
+				// Show success message
+				new Notice(isRomanian ? 'Amintirea a fost actualizată!' : 'Reminder updated successfully!');
+				
+				// Close modal
+				closeModal();
+			} catch (error) {
+				console.error('Error saving reminder:', error);
+				new Notice(isRomanian ? 'Eroare la salvarea amintirii!' : 'Error saving reminder!');
+			}
+		};
+
+		saveBtn?.addEventListener('click', saveChanges);
+		
+		cancelBtn?.addEventListener('click', closeModal);
+
+		// Close on outside click
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) {
+				closeModal();
+			}
+		});
+
+		// Handle Enter key
+		textInput.addEventListener('keypress', (e) => {
+			if (e.key === 'Enter') {
+				saveChanges();
+			}
+		});
+
+		// Handle Escape key
+		modal.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
+		});
+
+		// Focus on text input
+		setTimeout(() => textInput.focus(), 100);
 	}
 
 	// Habit tracker functionality
 	private async addHabit() {
+		await this.loadData(); // asigură sincronizarea cu fișierul
 		const habitNameInput = this.containerEl.querySelector('#habitNameInput') as HTMLInputElement;
-		
-		if (!habitNameInput) {
-			return;
-		}
-		
+		if (!habitNameInput) return;
 		const habitName = habitNameInput.value.trim();
-		
-		if (habitName === '') {
-			return;
-		}
-
+		if (habitName === '') return;
 		const selectedColor = this.containerEl.querySelector('.color-option.active') as HTMLElement;
 		const color = selectedColor?.getAttribute('data-color') || '#4CAF50';
-
 		const habit: Habit = {
 			id: Date.now(),
 			name: habitName,
@@ -1300,34 +1690,26 @@ export class RelaxingTodoView extends ItemView {
 			bestStreak: 0,
 			completions: {}
 		};
-
 		this.habits.push(habit);
 		await this.saveData();
-		
 		habitNameInput.value = '';
-		
-		// Reset color selection to first option
 		this.containerEl.querySelectorAll('.color-option').forEach(btn => btn.classList.remove('active'));
 		this.containerEl.querySelector('.color-option')?.classList.add('active');
-
 		this.renderHabits();
 	}
 
 	private async toggleHabit(id: number, date?: string) {
+		await this.loadData(); // asigură sincronizarea cu fișierul
 		const habitIndex = this.habits.findIndex(habit => habit.id === id);
 		if (habitIndex === -1) return;
-
 		const habit = this.habits[habitIndex];
 		const targetDate = date || this.getLocalDateString(new Date());
-		
-		// Toggle completion for the date
 		habit.completions[targetDate] = !habit.completions[targetDate];
-		
-		// Recalculate streak
 		this.updateHabitStreak(habit);
-		
 		await this.saveData();
-		this.renderHabits();
+		if (this.currentView === 'habits') {
+			this.renderHabits();
+		}
 	}
 
 	private updateHabitStreak(habit: Habit) {
@@ -1400,6 +1782,7 @@ export class RelaxingTodoView extends ItemView {
 	}
 
 	private async deleteHabit(id: number) {
+		await this.loadData(); // asigură sincronizarea cu fișierul
 		this.habits = this.habits.filter(habit => habit.id !== id);
 		await this.saveData();
 		this.renderHabits();
@@ -1408,26 +1791,19 @@ export class RelaxingTodoView extends ItemView {
 	private renderHabits() {
 		const habitsList = this.containerEl.querySelector('#habitsList');
 		const habitCounter = this.containerEl.querySelector('#habitCounter');
-		
 		if (!habitsList || !habitCounter) return;
-
 		const isRomanian = this.plugin.settings.language === 'ro';
-		
-		// Update counter with today's completed habits
 		const todayStr = this.getLocalDateString(new Date());
 		const completedToday = this.habits.filter(habit => habit.completions[todayStr]).length;
-		
 		if (isRomanian) {
 			habitCounter.textContent = `${completedToday}/${this.habits.length} ${this.habits.length !== 1 ? 'obiceiuri' : 'obicei'} astăzi`;
 		} else {
 			habitCounter.textContent = `${completedToday}/${this.habits.length} ${this.habits.length !== 1 ? 'habits' : 'habit'} today`;
 		}
-
 		if (this.habits.length === 0) {
 			habitsList.innerHTML = '';
 			return;
 		}
-
 		// Generate habit cards with last 7 days tracking
 		const today = new Date();
 		const days: Date[] = [];
@@ -1439,7 +1815,7 @@ export class RelaxingTodoView extends ItemView {
 
 		const dayLabels = isRomanian ? ['D', 'L', 'M', 'M', 'J', 'V', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-		habitsList.innerHTML = this.habits.map(habit => {
+		const newHtml = this.habits.map(habit => {
 			const dayCircles = days.map((date, index) => {
 				const dateStr = this.getLocalDateString(date);
 				const isCompleted = habit.completions[dateStr] || false;
@@ -1471,7 +1847,10 @@ export class RelaxingTodoView extends ItemView {
 								<span class="streak-best">${isRomanian ? 'Record' : 'Best'}: ${habit.bestStreak}</span>
 							</div>
 						</div>
-						<button class="habit-delete" data-habit-id="${habit.id}">×</button>
+						<div class="habit-actions">
+							<button class="habit-edit" data-habit-id="${habit.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
+							<button class="habit-delete" data-habit-id="${habit.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
+						</div>
 					</div>
 					<div class="habit-tracking">
 						<div class="habit-days">
@@ -1481,7 +1860,9 @@ export class RelaxingTodoView extends ItemView {
 				</div>
 			`;
 		}).join('');
-
+		if (habitsList.innerHTML !== newHtml) {
+			habitsList.innerHTML = newHtml;
+		}
 		// Add event listeners for habit tracking
 		habitsList.querySelectorAll('.habit-day').forEach(dayEl => {
 			dayEl.addEventListener('click', async (e) => {
@@ -1498,6 +1879,142 @@ export class RelaxingTodoView extends ItemView {
 				await this.deleteHabit(habitId);
 			});
 		});
+
+		// Add event listeners for edit buttons
+		habitsList.querySelectorAll('.habit-edit').forEach(editBtn => {
+			editBtn.addEventListener('click', async (e) => {
+				const habitId = parseInt((e.target as HTMLElement).getAttribute('data-habit-id') || '0');
+				await this.editHabit(habitId);
+			});
+		});
+	}
+
+	private async editHabit(id: number) {
+		const habit = this.habits.find(h => h.id === id);
+		if (!habit) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+		
+		// Remove any existing modal first
+		const existingModal = document.querySelector('.mindfuldo-edit-modal');
+		if (existingModal) {
+			document.body.removeChild(existingModal);
+		}
+		
+		// Create edit modal
+		const modal = document.createElement('div');
+		modal.className = 'mindfuldo-edit-modal';
+		modal.innerHTML = `
+			<div class="edit-modal-content">
+				<h3>${isRomanian ? 'Editează obiceiul' : 'Edit Habit'}</h3>
+				<div class="edit-form">
+					<div class="form-group">
+						<label>${isRomanian ? 'Nume:' : 'Name:'}</label>
+						<input type="text" id="editHabitName" value="${habit.name}" placeholder="${isRomanian ? 'Introduceți numele obiceiului' : 'Enter habit name'}">
+					</div>
+					<div class="form-group">
+						<label>${isRomanian ? 'Culoare:' : 'Color:'}</label>
+						<div class="color-options" id="editHabitColors">
+							<div class="color-option ${habit.color === '#4CAF50' ? 'active' : ''}" data-color="#4CAF50" style="background: #4CAF50;"></div>
+							<div class="color-option ${habit.color === '#2196F3' ? 'active' : ''}" data-color="#2196F3" style="background: #2196F3;"></div>
+							<div class="color-option ${habit.color === '#FF9800' ? 'active' : ''}" data-color="#FF9800" style="background: #FF9800;"></div>
+							<div class="color-option ${habit.color === '#E91E63' ? 'active' : ''}" data-color="#E91E63" style="background: #E91E63;"></div>
+							<div class="color-option ${habit.color === '#9C27B0' ? 'active' : ''}" data-color="#9C27B0" style="background: #9C27B0;"></div>
+							<div class="color-option ${habit.color === '#00BCD4' ? 'active' : ''}" data-color="#00BCD4" style="background: #00BCD4;"></div>
+						</div>
+					</div>
+					<div class="form-actions">
+						<button id="saveHabitEdit" class="save-btn">${isRomanian ? 'Salvează' : 'Save'}</button>
+						<button id="cancelHabitEdit" class="cancel-btn">${isRomanian ? 'Anulează' : 'Cancel'}</button>
+					</div>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// Add event listeners for color selection
+		const colorOptions = modal.querySelectorAll('.color-option');
+		colorOptions.forEach(option => {
+			option.addEventListener('click', () => {
+				colorOptions.forEach(opt => opt.classList.remove('active'));
+				option.classList.add('active');
+			});
+		});
+
+		// Add event listeners for save/cancel
+		const saveBtn = modal.querySelector('#saveHabitEdit');
+		const cancelBtn = modal.querySelector('#cancelHabitEdit');
+		const nameInput = modal.querySelector('#editHabitName') as HTMLInputElement;
+
+		const closeModal = () => {
+			if (document.body.contains(modal)) {
+				document.body.removeChild(modal);
+			}
+		};
+
+		const saveChanges = async () => {
+			const newName = nameInput.value.trim();
+			const selectedColor = modal.querySelector('.color-option.active') as HTMLElement;
+			const newColor = selectedColor?.getAttribute('data-color') || habit.color;
+
+			if (!newName) {
+				new Notice(isRomanian ? 'Numele nu poate fi gol!' : 'Name cannot be empty!');
+				nameInput.focus();
+				return;
+			}
+
+			try {
+				// Update habit
+				habit.name = newName;
+				habit.color = newColor;
+				
+				// Save data
+				await this.saveData();
+				
+				// Refresh display
+				if (this.currentView === 'habits') {
+					this.renderHabits();
+				}
+				
+				// Show success message
+				new Notice(isRomanian ? 'Obiceiul a fost actualizat!' : 'Habit updated successfully!');
+				
+				// Close modal
+				closeModal();
+			} catch (error) {
+				console.error('Error saving habit:', error);
+				new Notice(isRomanian ? 'Eroare la salvarea obiceiului!' : 'Error saving habit!');
+			}
+		};
+
+		saveBtn?.addEventListener('click', saveChanges);
+		
+		cancelBtn?.addEventListener('click', closeModal);
+
+		// Close on outside click
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) {
+				closeModal();
+			}
+		});
+
+		// Handle Enter key
+		nameInput.addEventListener('keypress', (e) => {
+			if (e.key === 'Enter') {
+				saveChanges();
+			}
+		});
+
+		// Handle Escape key
+		modal.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
+		});
+
+		// Focus on name input
+		setTimeout(() => nameInput.focus(), 100);
 	}
 
 	private currentMonth = new Date().getMonth();
@@ -2370,6 +2887,69 @@ class RelaxingTodoSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
+		// Feature Toggles Section
+		containerEl.createEl('h3', { text: isRomanian ? '🔧 Funcționalități' : '🔧 Features' });
+
+		new Setting(containerEl)
+			.setName(isRomanian ? 'Activează Sarcini' : 'Enable Tasks')
+			.setDesc(isRomanian ? 'Afișează secțiunea de sarcini în toolbar' : 'Show tasks section in toolbar')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableTasks)
+				.onChange(async (value) => {
+					this.plugin.settings.enableTasks = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(isRomanian ? 'Activează Amintiri' : 'Enable Reminders')
+			.setDesc(isRomanian ? 'Afișează secțiunea de amintiri în toolbar' : 'Show reminders section in toolbar')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableReminders)
+				.onChange(async (value) => {
+					this.plugin.settings.enableReminders = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(isRomanian ? 'Activează Obiceiuri' : 'Enable Habits')
+			.setDesc(isRomanian ? 'Afișează secțiunea de obiceiuri în toolbar' : 'Show habits section in toolbar')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableHabits)
+				.onChange(async (value) => {
+					this.plugin.settings.enableHabits = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(isRomanian ? 'Activează Analytics' : 'Enable Analytics')
+			.setDesc(isRomanian ? 'Afișează secțiunea de analiză în toolbar' : 'Show analytics section in toolbar')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableAnalytics)
+				.onChange(async (value) => {
+					this.plugin.settings.enableAnalytics = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(isRomanian ? 'Activează Calendar' : 'Enable Calendar')
+			.setDesc(isRomanian ? 'Afișează secțiunea de calendar în toolbar' : 'Show calendar section in toolbar')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableCalendar)
+				.onChange(async (value) => {
+					this.plugin.settings.enableCalendar = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(isRomanian ? 'Activează Pomodoro' : 'Enable Pomodoro')
+			.setDesc(isRomanian ? 'Afișează secțiunea de Pomodoro în toolbar' : 'Show Pomodoro section in toolbar')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enablePomodoro)
+				.onChange(async (value) => {
+					this.plugin.settings.enablePomodoro = value;
+					await this.plugin.saveSettings();
+				}));
+
 		// Pomodoro Settings Section
 		containerEl.createEl('h3', { text: isRomanian ? '🍅 Setări Pomodoro' : '🍅 Pomodoro Settings' });
 
@@ -2440,5 +3020,6 @@ class RelaxingTodoSettingTab extends PluginSettingTab {
 					this.plugin.settings.pomodoroAutoStartWork = value;
 					await this.plugin.saveSettings();
 				}));
+
 	}
 } 
