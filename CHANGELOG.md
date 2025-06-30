@@ -2,6 +2,43 @@
 
 All notable changes to the MindfulDo plugin will be documented in this file.
 
+## [1.2.6] - 2025-06-29
+
+### Added
+- **Delete Confirmation System** - Enhanced safety for all delete operations
+  - Confirmation modal for task deletion with task text preview
+  - Confirmation modal for reminder deletion with reminder text preview
+  - Confirmation modal for habit deletion with habit name preview
+  - Prevents accidental deletion of important items
+  - Consistent user experience across all delete operations
+  - Multilingual support (Romanian and English)
+  - Keyboard navigation support (Escape to cancel)
+  - Responsive design for all screen sizes
+  - Smooth animations and modern UI design
+
+### Improved
+- **User Safety** - Better protection against accidental data loss
+  - Clear visual feedback showing what will be deleted
+  - Two-step confirmation process for all delete operations
+  - Consistent confirmation dialogs across all features
+  - Improved accessibility with keyboard shortcuts
+- **User Experience** - Enhanced interaction design
+  - Professional modal design with proper styling
+  - Clear action buttons with appropriate colors (red for delete, gray for cancel)
+  - Focus management for better keyboard navigation
+  - Outside click to cancel functionality
+
+## [1.2.5] - 2025-06-29
+
+### Fixed
+- Habits are now always synchronized with the latest data from data.json before any change, ensuring correct sync between desktop and mobile (Obsidian).
+- Eliminated UI flicker when checking/unchecking a habit day: the interface only updates if the visual content actually changes. 
+
+## [1.2.4] - 2025-06-29
+
+### Fixed
+- **Dropdown Issue** - Fixed the category dropdown in the editor: the selected text is now fully visible when editing a task. 
+
 ## [1.2.3] - 2025-06-27
 
 ### Added
@@ -106,6 +143,7 @@ All notable changes to the MindfulDo plugin will be documented in this file.
 - **Responsive Design** - Better mobile and tablet experience
 - **Theme Integration** - Improved consistency across all themes
 - **Language Support** - Enhanced Romanian and English localization
+- **Dropdown Issue** - Fixed the category dropdown in the editor: the selected text is now fully visible when editing a task.
 
 ## [1.1.0] - 2025-06-25
 
@@ -152,3 +190,4 @@ All notable changes to the MindfulDo plugin will be documented in this file.
 - Responsive design with CSS variables
 - Obsidian plugin architecture
 - Local vault storage for data persistence 
+
