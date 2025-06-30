@@ -1071,6 +1071,74 @@ export class RelaxingTodoView extends ItemView {
 		this.renderTasks();
 	}
 
+	private confirmDeleteTask(id: number) {
+		const task = this.tasks.find(t => t.id === id);
+		if (!task) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+		
+		// Remove any existing modal first
+		const existingModal = document.querySelector('.mindfuldo-confirm-modal');
+		if (existingModal) {
+			document.body.removeChild(existingModal);
+		}
+		
+		// Create confirmation modal
+		const modal = document.createElement('div');
+		modal.className = 'mindfuldo-confirm-modal';
+		modal.innerHTML = `
+			<div class="confirm-modal-content">
+				<h3>${isRomanian ? 'Confirmare ștergere' : 'Confirm Delete'}</h3>
+				<div class="confirm-message">
+					<p>${isRomanian ? 'Sigur doriți să ștergeți sarcina:' : 'Are you sure you want to delete the task:'}</p>
+					<p class="task-text">"${task.text}"</p>
+				</div>
+				<div class="confirm-actions">
+					<button id="confirmDelete" class="delete-btn">${isRomanian ? 'Șterge' : 'Delete'}</button>
+					<button id="cancelDelete" class="cancel-btn">${isRomanian ? 'Anulează' : 'Cancel'}</button>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// Add event listeners
+		const confirmBtn = modal.querySelector('#confirmDelete');
+		const cancelBtn = modal.querySelector('#cancelDelete');
+
+		const closeModal = () => {
+			if (document.body.contains(modal)) {
+				document.body.removeChild(modal);
+			}
+		};
+
+		const deleteTask = () => {
+			this.deleteTask(id);
+			closeModal();
+			new Notice(isRomanian ? 'Sarcina a fost ștearsă!' : 'Task deleted successfully!');
+		};
+
+		confirmBtn?.addEventListener('click', deleteTask);
+		cancelBtn?.addEventListener('click', closeModal);
+
+		// Close on outside click
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) {
+				closeModal();
+			}
+		});
+
+		// Handle Escape key
+		modal.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
+		});
+
+		// Focus on confirm button
+		setTimeout(() => (confirmBtn as HTMLButtonElement)?.focus(), 100);
+	}
+
 	private editTask(id: number) {
 		const task = this.tasks.find(t => t.id === id);
 		if (!task) return;
@@ -1324,7 +1392,7 @@ export class RelaxingTodoView extends ItemView {
 		tasksList.querySelectorAll('.task-delete').forEach(deleteBtn => {
 			deleteBtn.addEventListener('click', (e) => {
 				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
-				this.deleteTask(taskId);
+				this.confirmDeleteTask(taskId);
 			});
 		});
 	}
@@ -1530,7 +1598,7 @@ export class RelaxingTodoView extends ItemView {
 		remindersList.querySelectorAll('.reminder-delete').forEach(deleteBtn => {
 			deleteBtn.addEventListener('click', (e) => {
 				const reminderId = parseInt((e.target as HTMLElement).getAttribute('data-reminder-id') || '0');
-				this.deleteReminder(reminderId);
+				this.confirmDeleteReminder(reminderId);
 			});
 		});
 
@@ -1876,7 +1944,7 @@ export class RelaxingTodoView extends ItemView {
 		habitsList.querySelectorAll('.habit-delete').forEach(deleteBtn => {
 			deleteBtn.addEventListener('click', async (e) => {
 				const habitId = parseInt((e.target as HTMLElement).getAttribute('data-habit-id') || '0');
-				await this.deleteHabit(habitId);
+				this.confirmDeleteHabit(habitId);
 			});
 		});
 
@@ -2783,6 +2851,141 @@ export class RelaxingTodoView extends ItemView {
 		}
 	}
 
+	private confirmDeleteReminder(id: number) {
+		const reminder = this.reminders.find(r => r.id === id);
+		if (!reminder) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+		
+		// Remove any existing modal first
+		const existingModal = document.querySelector('.mindfuldo-confirm-modal');
+		if (existingModal) {
+			document.body.removeChild(existingModal);
+		}
+		
+		// Create confirmation modal
+		const modal = document.createElement('div');
+		modal.className = 'mindfuldo-confirm-modal';
+		modal.innerHTML = `
+			<div class="confirm-modal-content">
+				<h3>${isRomanian ? 'Confirmare ștergere' : 'Confirm Delete'}</h3>
+				<div class="confirm-message">
+					<p>${isRomanian ? 'Sigur doriți să ștergeți amintirea:' : 'Are you sure you want to delete the reminder:'}</p>
+					<p class="task-text">"${reminder.text}"</p>
+				</div>
+				<div class="confirm-actions">
+					<button id="confirmDelete" class="delete-btn">${isRomanian ? 'Șterge' : 'Delete'}</button>
+					<button id="cancelDelete" class="cancel-btn">${isRomanian ? 'Anulează' : 'Cancel'}</button>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// Add event listeners
+		const confirmBtn = modal.querySelector('#confirmDelete');
+		const cancelBtn = modal.querySelector('#cancelDelete');
+
+		const closeModal = () => {
+			if (document.body.contains(modal)) {
+				document.body.removeChild(modal);
+			}
+		};
+
+		const deleteReminder = () => {
+			this.deleteReminder(id);
+			closeModal();
+			new Notice(isRomanian ? 'Amintirea a fost ștearsă!' : 'Reminder deleted successfully!');
+		};
+
+		confirmBtn?.addEventListener('click', deleteReminder);
+		cancelBtn?.addEventListener('click', closeModal);
+
+		// Close on outside click
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) {
+				closeModal();
+			}
+		});
+
+		// Handle Escape key
+		modal.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
+		});
+
+		// Focus on confirm button
+		setTimeout(() => (confirmBtn as HTMLButtonElement)?.focus(), 100);
+	}
+
+	private confirmDeleteHabit(id: number) {
+		const habit = this.habits.find(h => h.id === id);
+		if (!habit) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+		
+		// Remove any existing modal first
+		const existingModal = document.querySelector('.mindfuldo-confirm-modal');
+		if (existingModal) {
+			document.body.removeChild(existingModal);
+		}
+		
+		// Create confirmation modal
+		const modal = document.createElement('div');
+		modal.className = 'mindfuldo-confirm-modal';
+		modal.innerHTML = `
+			<div class="confirm-modal-content">
+				<h3>${isRomanian ? 'Confirmare ștergere' : 'Confirm Delete'}</h3>
+				<div class="confirm-message">
+					<p>${isRomanian ? 'Sigur doriți să ștergeți obiceiul:' : 'Are you sure you want to delete the habit:'}</p>
+					<p class="task-text">"${habit.name}"</p>
+				</div>
+				<div class="confirm-actions">
+					<button id="confirmDelete" class="delete-btn">${isRomanian ? 'Șterge' : 'Delete'}</button>
+					<button id="cancelDelete" class="cancel-btn">${isRomanian ? 'Anulează' : 'Cancel'}</button>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// Add event listeners
+		const confirmBtn = modal.querySelector('#confirmDelete');
+		const cancelBtn = modal.querySelector('#cancelDelete');
+
+		const closeModal = () => {
+			if (document.body.contains(modal)) {
+				document.body.removeChild(modal);
+			}
+		};
+
+		const deleteHabit = async () => {
+			await this.deleteHabit(id);
+			closeModal();
+			new Notice(isRomanian ? 'Obiceiul a fost șters!' : 'Habit deleted successfully!');
+		};
+
+		confirmBtn?.addEventListener('click', deleteHabit);
+		cancelBtn?.addEventListener('click', closeModal);
+
+		// Close on outside click
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) {
+				closeModal();
+			}
+		});
+
+		// Handle Escape key
+		modal.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeModal();
+			}
+		});
+
+		// Focus on confirm button
+		setTimeout(() => (confirmBtn as HTMLButtonElement)?.focus(), 100);
+	}
 
 }
 
