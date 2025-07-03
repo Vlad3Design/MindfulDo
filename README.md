@@ -12,6 +12,7 @@ A calm, beautiful, and feature-rich todo list for Obsidian that helps you stay o
 
 ### 📝 **Task Management**
 - **Categorized tasks** with 6 pre-defined categories (Work, Personal, Health, Learning, Hobby)
+- **Drag & Drop Reordering** - Comprehensive reordering system for all item types
 - **Real-time task counting** with completion tracking
 - **Smooth animations** for a relaxing user experience
 - **Enhanced local storage** - all data stays in your Obsidian vault with improved persistence
