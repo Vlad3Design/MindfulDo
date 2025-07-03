@@ -4089,3 +4089,125 @@
   overflow: visible;
   white-space: normal;
 }
+
+/* Drag and Drop Styles */
+.drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+  user-select: none;
+  min-width: 20px;
+}
+
+.drag-handle:hover {
+  opacity: 1;
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Task item modifications for drag & drop */
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.task-item.dragging {
+  opacity: 0.5;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+.task-item.drop-above {
+  border-top: 2px solid var(--interactive-accent);
+}
+
+.task-item.drop-below {
+  border-bottom: 2px solid var(--interactive-accent);
+}
+
+/* Reminder item modifications for drag & drop */
+.reminder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reminder-item.dragging {
+  opacity: 0.5;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+.reminder-item.drop-above {
+  border-top: 2px solid var(--interactive-accent);
+}
+
+.reminder-item.drop-below {
+  border-bottom: 2px solid var(--interactive-accent);
+}
+
+/* Habit item modifications for drag & drop */
+.habit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.habit-item.dragging {
+  opacity: 0.5;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+.habit-item.drop-above {
+  border-top: 2px solid var(--interactive-accent);
+}
+
+.habit-item.drop-below {
+  border-bottom: 2px solid var(--interactive-accent);
+}
+
+/* Responsive drag handle for mobile */
+@media (max-width: 768px) {
+  .drag-handle {
+    font-size: 14px;
+    min-width: 24px;
+  }
+}
+
+/* Theme-specific drag handle colors */
+.mindfuldo-container[data-theme="ocean"] .drag-handle:hover {
+  color: #2196F3;
+}
+
+.mindfuldo-container[data-theme="forest"] .drag-handle:hover {
+  color: #4CAF50;
+}
+
+.mindfuldo-container[data-theme="sunset"] .drag-handle:hover {
+  color: #FF5722;
+}
+
+.mindfuldo-container[data-theme="purple"] .drag-handle:hover {
+  color: #9C27B0;
+}
+
+.mindfuldo-container[data-theme="midnight"] .drag-handle:hover {
+  color: #E0E0E0;
+}

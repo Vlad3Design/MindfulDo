@@ -45,13 +45,13 @@ var DEFAULT_SETTINGS = {
   pomodoroSessionsBeforeLongBreak: 4,
   pomodoroAutoStartBreaks: false,
   pomodoroAutoStartWork: false,
-  // Feature Toggles
+  // Feature Toggles - by default only tasks are enabled
   enableTasks: true,
-  enableReminders: true,
-  enableHabits: true,
-  enableAnalytics: true,
-  enableCalendar: true,
-  enablePomodoro: true
+  enableReminders: false,
+  enableHabits: false,
+  enableAnalytics: false,
+  enableCalendar: false,
+  enablePomodoro: false
 };
 var VIEW_TYPE_RELAXING_TODO = "relaxing-todo-view";
 var RelaxingTodoPlugin = class extends import_obsidian.Plugin {
@@ -859,7 +859,8 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       text: taskText,
       completed: false,
       category: this.currentCategory === "toate" ? "work" : this.currentCategory,
-      createdAt: this.getLocalDateString(new Date())
+      createdAt: this.getLocalDateString(new Date()),
+      order: this.tasks.length + 1
     };
     this.tasks.push(task);
     await this.saveData();
@@ -1124,7 +1125,7 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
         return 1;
       if (!a.completed && b.completed)
         return -1;
-      return 0;
+      return (a.order || 0) - (b.order || 0);
     });
     const completedTasks = this.tasks.filter((task) => task.completed);
     const activeTasks = this.tasks.filter((task) => !task.completed);
@@ -1140,7 +1141,8 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       return;
     }
     tasksList.innerHTML = filteredTasks.map((task) => `
-			<div class="task-item ${task.completed ? "completed" : ""}" data-task-id="${task.id}">
+			<div class="task-item ${task.completed ? "completed" : ""}" data-task-id="${task.id}" draggable="true">
+				<div class="drag-handle" title="${isRomanian ? "Trage\u021Bi pentru a reordona" : "Drag to reorder"}">\u22EE\u22EE</div>
 				<div class="task-checkbox ${task.completed ? "checked" : ""}" data-task-id="${task.id}"></div>
 				<div class="task-text" data-task-id="${task.id}">${task.text}</div>
 				<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
@@ -1168,6 +1170,76 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
         this.confirmDeleteTask(taskId);
       });
     });
+    this.setupTasksDragAndDrop();
+  }
+  setupTasksDragAndDrop() {
+    const tasksList = this.containerEl.querySelector("#tasksList");
+    if (!tasksList)
+      return;
+    const taskItems = tasksList.querySelectorAll(".task-item");
+    let draggedElement = null;
+    let draggedTaskId = null;
+    taskItems.forEach((item) => {
+      const taskItem = item;
+      taskItem.addEventListener("dragstart", (e) => {
+        draggedElement = taskItem;
+        draggedTaskId = parseInt(taskItem.getAttribute("data-task-id") || "0");
+        taskItem.classList.add("dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/html", taskItem.outerHTML);
+        }
+      });
+      taskItem.addEventListener("dragend", () => {
+        taskItem.classList.remove("dragging");
+        draggedElement = null;
+        draggedTaskId = null;
+      });
+      taskItem.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = "move";
+        }
+        if (draggedElement && draggedElement !== taskItem) {
+          const rect = taskItem.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (e.clientY < midY) {
+            taskItem.classList.add("drop-above");
+            taskItem.classList.remove("drop-below");
+          } else {
+            taskItem.classList.add("drop-below");
+            taskItem.classList.remove("drop-above");
+          }
+        }
+      });
+      taskItem.addEventListener("dragleave", () => {
+        taskItem.classList.remove("drop-above", "drop-below");
+      });
+      taskItem.addEventListener("drop", (e) => {
+        e.preventDefault();
+        taskItem.classList.remove("drop-above", "drop-below");
+        if (draggedTaskId && draggedElement && draggedElement !== taskItem) {
+          const targetTaskId = parseInt(taskItem.getAttribute("data-task-id") || "0");
+          this.reorderTasks(draggedTaskId, targetTaskId, e.clientY < taskItem.getBoundingClientRect().top + taskItem.getBoundingClientRect().height / 2);
+        }
+      });
+    });
+  }
+  async reorderTasks(draggedId, targetId, insertBefore) {
+    const draggedTask = this.tasks.find((t) => t.id === draggedId);
+    const targetTask = this.tasks.find((t) => t.id === targetId);
+    if (!draggedTask || !targetTask)
+      return;
+    const draggedIndex = this.tasks.indexOf(draggedTask);
+    this.tasks.splice(draggedIndex, 1);
+    const targetIndex = this.tasks.indexOf(targetTask);
+    const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+    this.tasks.splice(insertIndex, 0, draggedTask);
+    this.tasks.forEach((task, index) => {
+      task.order = index + 1;
+    });
+    await this.saveData();
+    this.renderTasks();
   }
   getCategoryName(category) {
     const isRomanian = this.plugin.settings.language === "ro";
@@ -1198,6 +1270,31 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     this.tasks = (data == null ? void 0 : data.tasks) || [];
     this.reminders = (data == null ? void 0 : data.reminders) || [];
     this.habits = (data == null ? void 0 : data.habits) || [];
+    this.migrateDataToIncludeOrder();
+  }
+  migrateDataToIncludeOrder() {
+    let needsSave = false;
+    this.tasks.forEach((task, index) => {
+      if (task.order === void 0) {
+        task.order = index + 1;
+        needsSave = true;
+      }
+    });
+    this.reminders.forEach((reminder, index) => {
+      if (reminder.order === void 0) {
+        reminder.order = index + 1;
+        needsSave = true;
+      }
+    });
+    this.habits.forEach((habit, index) => {
+      if (habit.order === void 0) {
+        habit.order = index + 1;
+        needsSave = true;
+      }
+    });
+    if (needsSave) {
+      this.saveData();
+    }
   }
   async saveData() {
     const data = await this.plugin.loadData() || {};
@@ -1274,7 +1371,8 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       text,
       dateTime,
       expired: false,
-      createdAt: this.getLocalDateString(new Date())
+      createdAt: this.getLocalDateString(new Date()),
+      order: this.reminders.length + 1
     };
     this.reminders.push(newReminder);
     await this.saveData();
@@ -1299,6 +1397,11 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
         return 1;
       if (!a.expired && b.expired)
         return -1;
+      if (a.expired === b.expired) {
+        const orderDiff = (a.order || 0) - (b.order || 0);
+        if (orderDiff !== 0)
+          return orderDiff;
+      }
       return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
     });
     const activeReminders = this.reminders.filter((reminder) => !reminder.expired);
@@ -1321,7 +1424,8 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       const dateStr = reminderDate.toLocaleDateString("ro-RO");
       const timeStr = reminderDate.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
       return `
-				<div class="reminder-item ${reminder.expired ? "expired" : ""}">
+				<div class="reminder-item ${reminder.expired ? "expired" : ""}" data-reminder-id="${reminder.id}" draggable="true">
+					<div class="drag-handle" title="${isRomanian ? "Trage\u021Bi pentru a reordona" : "Drag to reorder"}">\u22EE\u22EE</div>
 					<div class="reminder-content">
 						<div class="reminder-text">${reminder.text}</div>
 						<div class="reminder-time">${dateStr} la ${timeStr}</div>
@@ -1346,6 +1450,76 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
         this.editReminder(reminderId);
       });
     });
+    this.setupRemindersDragAndDrop();
+  }
+  setupRemindersDragAndDrop() {
+    const remindersList = this.containerEl.querySelector("#remindersList");
+    if (!remindersList)
+      return;
+    const reminderItems = remindersList.querySelectorAll(".reminder-item");
+    let draggedElement = null;
+    let draggedReminderId = null;
+    reminderItems.forEach((item) => {
+      const reminderItem = item;
+      reminderItem.addEventListener("dragstart", (e) => {
+        draggedElement = reminderItem;
+        draggedReminderId = parseInt(reminderItem.getAttribute("data-reminder-id") || "0");
+        reminderItem.classList.add("dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/html", reminderItem.outerHTML);
+        }
+      });
+      reminderItem.addEventListener("dragend", () => {
+        reminderItem.classList.remove("dragging");
+        draggedElement = null;
+        draggedReminderId = null;
+      });
+      reminderItem.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = "move";
+        }
+        if (draggedElement && draggedElement !== reminderItem) {
+          const rect = reminderItem.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (e.clientY < midY) {
+            reminderItem.classList.add("drop-above");
+            reminderItem.classList.remove("drop-below");
+          } else {
+            reminderItem.classList.add("drop-below");
+            reminderItem.classList.remove("drop-above");
+          }
+        }
+      });
+      reminderItem.addEventListener("dragleave", () => {
+        reminderItem.classList.remove("drop-above", "drop-below");
+      });
+      reminderItem.addEventListener("drop", (e) => {
+        e.preventDefault();
+        reminderItem.classList.remove("drop-above", "drop-below");
+        if (draggedReminderId && draggedElement && draggedElement !== reminderItem) {
+          const targetReminderId = parseInt(reminderItem.getAttribute("data-reminder-id") || "0");
+          this.reorderReminders(draggedReminderId, targetReminderId, e.clientY < reminderItem.getBoundingClientRect().top + reminderItem.getBoundingClientRect().height / 2);
+        }
+      });
+    });
+  }
+  async reorderReminders(draggedId, targetId, insertBefore) {
+    const draggedReminder = this.reminders.find((r) => r.id === draggedId);
+    const targetReminder = this.reminders.find((r) => r.id === targetId);
+    if (!draggedReminder || !targetReminder)
+      return;
+    const draggedIndex = this.reminders.indexOf(draggedReminder);
+    this.reminders.splice(draggedIndex, 1);
+    const targetIndex = this.reminders.indexOf(targetReminder);
+    const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+    this.reminders.splice(insertIndex, 0, draggedReminder);
+    this.reminders.forEach((reminder, index) => {
+      reminder.order = index + 1;
+    });
+    await this.saveData();
+    this.renderReminders();
   }
   editReminder(id) {
     const reminder = this.reminders.find((r) => r.id === id);
@@ -1462,7 +1636,8 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       createdAt: this.getLocalDateString(new Date()),
       streak: 0,
       bestStreak: 0,
-      completions: {}
+      completions: {},
+      order: this.habits.length + 1
     };
     this.habits.push(habit);
     await this.saveData();
@@ -1556,6 +1731,7 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       habitsList.innerHTML = "";
       return;
     }
+    const sortedHabits = [...this.habits].sort((a, b) => (a.order || 0) - (b.order || 0));
     const today = new Date();
     const days = [];
     for (let i = 6; i >= 0; i--) {
@@ -1564,7 +1740,7 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       days.push(date);
     }
     const dayLabels = isRomanian ? ["D", "L", "M", "M", "J", "V", "S"] : ["S", "M", "T", "W", "T", "F", "S"];
-    const newHtml = this.habits.map((habit) => {
+    const newHtml = sortedHabits.map((habit) => {
       const dayCircles = days.map((date, index) => {
         const dateStr = this.getLocalDateString(date);
         const isCompleted = habit.completions[dateStr] || false;
@@ -1584,7 +1760,8 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
 				`;
       }).join("");
       return `
-				<div class="habit-item">
+				<div class="habit-item" data-habit-id="${habit.id}" draggable="true">
+					<div class="drag-handle" title="${isRomanian ? "Trage\u021Bi pentru a reordona" : "Drag to reorder"}">\u22EE\u22EE</div>
 					<div class="habit-header">
 						<div class="habit-info">
 							<div class="habit-name" style="color: ${habit.color};">${habit.name}</div>
@@ -1629,6 +1806,76 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
         await this.editHabit(habitId);
       });
     });
+    this.setupHabitsDragAndDrop();
+  }
+  setupHabitsDragAndDrop() {
+    const habitsList = this.containerEl.querySelector("#habitsList");
+    if (!habitsList)
+      return;
+    const habitItems = habitsList.querySelectorAll(".habit-item");
+    let draggedElement = null;
+    let draggedHabitId = null;
+    habitItems.forEach((item) => {
+      const habitItem = item;
+      habitItem.addEventListener("dragstart", (e) => {
+        draggedElement = habitItem;
+        draggedHabitId = parseInt(habitItem.getAttribute("data-habit-id") || "0");
+        habitItem.classList.add("dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/html", habitItem.outerHTML);
+        }
+      });
+      habitItem.addEventListener("dragend", () => {
+        habitItem.classList.remove("dragging");
+        draggedElement = null;
+        draggedHabitId = null;
+      });
+      habitItem.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = "move";
+        }
+        if (draggedElement && draggedElement !== habitItem) {
+          const rect = habitItem.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (e.clientY < midY) {
+            habitItem.classList.add("drop-above");
+            habitItem.classList.remove("drop-below");
+          } else {
+            habitItem.classList.add("drop-below");
+            habitItem.classList.remove("drop-above");
+          }
+        }
+      });
+      habitItem.addEventListener("dragleave", () => {
+        habitItem.classList.remove("drop-above", "drop-below");
+      });
+      habitItem.addEventListener("drop", (e) => {
+        e.preventDefault();
+        habitItem.classList.remove("drop-above", "drop-below");
+        if (draggedHabitId && draggedElement && draggedElement !== habitItem) {
+          const targetHabitId = parseInt(habitItem.getAttribute("data-habit-id") || "0");
+          this.reorderHabits(draggedHabitId, targetHabitId, e.clientY < habitItem.getBoundingClientRect().top + habitItem.getBoundingClientRect().height / 2);
+        }
+      });
+    });
+  }
+  async reorderHabits(draggedId, targetId, insertBefore) {
+    const draggedHabit = this.habits.find((h) => h.id === draggedId);
+    const targetHabit = this.habits.find((h) => h.id === targetId);
+    if (!draggedHabit || !targetHabit)
+      return;
+    const draggedIndex = this.habits.indexOf(draggedHabit);
+    this.habits.splice(draggedIndex, 1);
+    const targetIndex = this.habits.indexOf(targetHabit);
+    const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+    this.habits.splice(insertIndex, 0, draggedHabit);
+    this.habits.forEach((habit, index) => {
+      habit.order = index + 1;
+    });
+    await this.saveData();
+    this.renderHabits();
   }
   async editHabit(id) {
     const habit = this.habits.find((h) => h.id === id);
