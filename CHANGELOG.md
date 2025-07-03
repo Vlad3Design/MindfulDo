@@ -2,6 +2,48 @@
 
 All notable changes to the MindfulDo plugin will be documented in this file.
 
+## [1.2.7] - 2025-07-03
+
+### Added
+- **Drag & Drop Reordering** - Comprehensive reordering system for all item types
+  - Drag and drop functionality for tasks with visual feedback
+  - Drag and drop functionality for reminders with priority sorting
+  - Drag and drop functionality for habits with custom ordering
+  - Visual drag handles (⋮⋮) for intuitive interaction
+  - Drop indicators showing where items will be placed
+  - Smooth animations and transitions during drag operations
+  - Automatic order persistence and synchronization
+  - Touch-friendly design for mobile devices
+
+### Changed
+- **Default Settings** - Simplified initial configuration for new users
+  - Only tasks are enabled by default for a cleaner first experience
+  - Users can enable additional features (reminders, habits, analytics, calendar, pomodoro) as needed
+  - Reduces cognitive load for new users while maintaining full functionality
+- **Item Ordering** - Enhanced sorting and organization
+  - All tasks, reminders, and habits now have persistent order values
+  - Items maintain their custom order across app restarts
+  - Completed tasks still sort to bottom but preserve relative order
+  - Data migration automatically adds order values to existing items
+
+### Improved
+- **User Experience** - Enhanced interaction design
+  - Visual feedback during drag operations with scaling and shadows
+  - Clear drop zone indicators with colored borders
+  - Responsive drag handles that adapt to different themes
+  - Consistent drag behavior across all item types
+  - Better mobile and touch device support
+- **Performance** - Optimized drag and drop operations
+  - Efficient reordering algorithms that minimize data changes
+  - Batched save operations to reduce storage overhead
+  - Smooth animations that don't impact scrolling performance
+
+### Technical
+- Added `order` property to Task, Reminder, and Habit interfaces
+- Implemented automatic data migration for existing installations
+- Enhanced CSS with drag-and-drop specific styling
+- Theme-specific drag handle colors for visual consistency
+
 ## [1.2.6] - 2025-06-29
 
 ### Added
