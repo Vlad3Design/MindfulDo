@@ -6,7 +6,7 @@
 
 A calm, beautiful, and feature-rich todo list for Obsidian that helps you stay organized without stress.
 
-![Plugin Preview](https://img.shields.io/badge/Obsidian-Plugin-purple) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-1.2.7-blue)
+![Plugin Preview](https://img.shields.io/badge/Obsidian-Plugin-purple) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-1.2.8-blue)
 
 ## ✨ Features
 
