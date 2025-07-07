@@ -2,6 +2,37 @@
 
 All notable changes to the MindfulDo plugin will be documented in this file.
 
+## [1.2.9.1] - 2025-07-07
+
+### Fixed
+- **Task Reordering System** - Replaced problematic drag & drop with reliable arrow button system
+  - Eliminated inconsistent drag & drop behavior that caused order loss
+  - Implemented simple ↑↓ arrow buttons for each task
+  - Buttons automatically disable when reordering is not possible (first/last position)
+  - Guaranteed order persistence after any reordering operation
+  - Better mobile compatibility and touch-friendly interface
+  - Immediate visual feedback and automatic save after each reorder action
+
+### Improved
+- **User Experience** - Enhanced task management reliability
+  - No more dependency on complex drag & drop event listeners
+  - Clear and intuitive reordering interface
+  - Consistent behavior across all devices and browsers
+  - Faster and more responsive reordering operations
+  - Better accessibility for users with motor difficulties
+
+### Technical
+- Replaced `setupTasksDragAndDrop()` with `setupTasksReordering()`
+- Added `moveTaskUp()` and `moveTaskDown()` functions for reliable order management
+- Enhanced CSS with modern button styling and hover effects
+- Simplified event handling for better performance and reliability
+
+## [1.2.8] - 2025-07-04
+
+### Improved
+- **Live Drag & Drop** for tasks: the task list now rearranges instantly as you drag a task, providing a modern and intuitive experience with fluid visual feedback. Reordering happens live, not just at the end of the drag action.
+- Build compatibility optimized for Obsidian (correct plugin class export).
+
 ## [1.2.7] - 2025-07-03
 
 ### Added
