@@ -194,6 +194,9 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     this.disableSync = false;
     this.currentMonth = new Date().getMonth();
     this.currentYear = new Date().getFullYear();
+    // Current month and year for habits calendar
+    this.currentHabitsMonth = new Date().getMonth();
+    this.currentHabitsYear = new Date().getFullYear();
     this.plugin = plugin;
   }
   getViewType() {
@@ -1888,41 +1891,26 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       habitCounter.textContent = `${completedToday}/${this.habits.length} ${this.habits.length !== 1 ? "habits" : "habit"} today`;
     }
     if (this.habits.length === 0) {
-      habitsList.innerHTML = "";
+      habitsList.innerHTML = `
+				<div class="empty-habits">
+					<div class="empty-habits-icon">\u{1F3AF}</div>
+					<p>${isRomanian ? "Niciun obicei \xEEnc\u0103. Adaug\u0103 primul pentru a \xEEncepe!" : "No habits yet. Add your first to get started!"}</p>
+				</div>
+			`;
       return;
     }
     const sortedHabits = [...this.habits].sort((a, b) => (a.order || 0) - (b.order || 0));
-    const today = new Date();
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      days.push(date);
-    }
-    const dayLabels = isRomanian ? ["D", "L", "M", "M", "J", "V", "S"] : ["S", "M", "T", "W", "T", "F", "S"];
-    const newHtml = sortedHabits.map((habit) => {
-      const dayCircles = days.map((date, index) => {
-        const dateStr = this.getLocalDateString(date);
-        const isCompleted = habit.completions[dateStr] || false;
-        const isToday = dateStr === this.getLocalDateString(today);
-        const dayLabel = dayLabels[date.getDay()];
-        return `
-					<div class="habit-day-container">
-						<div class="habit-day ${isCompleted ? "completed" : ""} ${isToday ? "today" : ""}" 
-							 data-habit-id="${habit.id}" 
-							 data-date="${dateStr}"
-							 style="border-color: ${habit.color}; ${isCompleted && !isToday ? `background-color: ${habit.color};` : ""}"
-							 title="${isToday ? isRomanian ? "Ast\u0103zi" : "Today" : date.toLocaleDateString()}">
-							${isCompleted ? "\u2713" : ""}
-						</div>
-						<div class="habit-day-label">${dayLabel}</div>
-					</div>
-				`;
-      }).join("");
+    const currentDate = new Date(this.currentHabitsYear, this.currentHabitsMonth, 1);
+    const monthNames = isRomanian ? ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"] : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const newHtml = sortedHabits.map((habit, habitIndex) => {
+      const monthCalendar = this.generateHabitMonthCalendar(habit, currentDate, isRomanian);
       return `
-				<div class="habit-item" data-habit-id="${habit.id}" draggable="true">
-					<div class="drag-handle" title="${isRomanian ? "Trage\u021Bi pentru a reordona" : "Drag to reorder"}">\u22EE\u22EE</div>
+				<div class="habit-item" data-habit-id="${habit.id}">
 					<div class="habit-header">
+						<div class="habit-reorder">
+							<button class="habit-move-up" data-habit-id="${habit.id}" title="${isRomanian ? "Mut\u0103 \xEEn sus" : "Move up"}" ${habitIndex === 0 ? "disabled" : ""}>\u2191</button>
+							<button class="habit-move-down" data-habit-id="${habit.id}" title="${isRomanian ? "Mut\u0103 \xEEn jos" : "Move down"}" ${habitIndex === sortedHabits.length - 1 ? "disabled" : ""}>\u2193</button>
+						</div>
 						<div class="habit-info">
 							<div class="habit-name" style="color: ${habit.color};">${habit.name}</div>
 							<div class="habit-stats">
@@ -1936,10 +1924,13 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
 							<button class="habit-delete" data-habit-id="${habit.id}" title="${isRomanian ? "\u0218terge" : "Delete"}">\xD7</button>
 						</div>
 					</div>
-					<div class="habit-tracking">
-						<div class="habit-days">
-							${dayCircles}
+					<div class="habit-calendar">
+						<div class="habit-calendar-header">
+							<button class="habit-month-nav habit-prev-month" data-habit-id="${habit.id}" title="${isRomanian ? "Luna anterioar\u0103" : "Previous month"}">\u2039</button>
+							<span class="habit-month-title">${monthNames[this.currentHabitsMonth]} ${this.currentHabitsYear}</span>
+							<button class="habit-month-nav habit-next-month" data-habit-id="${habit.id}" title="${isRomanian ? "Luna urm\u0103toare" : "Next month"}">\u203A</button>
 						</div>
+						${monthCalendar}
 					</div>
 				</div>
 			`;
@@ -1947,164 +1938,140 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     if (habitsList.innerHTML !== newHtml) {
       habitsList.innerHTML = newHtml;
     }
-    habitsList.querySelectorAll(".habit-day").forEach((dayEl) => {
-      dayEl.addEventListener("click", async (e) => {
-        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
-        const date = e.target.getAttribute("data-date") || "";
-        await this.toggleHabit(habitId, date);
-      });
-    });
-    habitsList.querySelectorAll(".habit-delete").forEach((deleteBtn) => {
-      deleteBtn.addEventListener("click", async (e) => {
-        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
-        this.confirmDeleteHabit(habitId);
-      });
-    });
-    habitsList.querySelectorAll(".habit-edit").forEach((editBtn) => {
-      editBtn.addEventListener("click", async (e) => {
-        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
-        await this.editHabit(habitId);
-      });
-    });
-    this.setupHabitsDragAndDrop();
+    this.setupHabitsEventListeners();
   }
-  renderHabitsWithoutDragSetup() {
+  generateHabitMonthCalendar(habit, currentDate, isRomanian) {
+    const today = new Date();
+    const todayStr = this.getLocalDateString(today);
+    const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const firstDayOfWeek = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
+    const weekDays = isRomanian ? ["D", "L", "M", "M", "J", "V", "S"] : ["S", "M", "T", "W", "T", "F", "S"];
+    let calendarHtml = '<div class="habit-calendar-grid">';
+    calendarHtml += '<div class="habit-calendar-weekdays">';
+    weekDays.forEach((day) => {
+      calendarHtml += `<div class="habit-weekday">${day}</div>`;
+    });
+    calendarHtml += "</div>";
+    calendarHtml += '<div class="habit-calendar-days">';
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      calendarHtml += '<div class="habit-calendar-day empty"></div>';
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+      const dayDateStr = this.getLocalDateString(dayDate);
+      const isCompleted = habit.completions[dayDateStr] || false;
+      const isToday = dayDateStr === todayStr;
+      const isFuture = dayDate > today;
+      calendarHtml += `
+				<div class="habit-calendar-day ${isCompleted ? "completed" : ""} ${isToday ? "today" : ""} ${isFuture ? "future" : ""}"
+					 data-habit-id="${habit.id}"
+					 data-date="${dayDateStr}"
+					 style="--habit-color: ${habit.color}"
+					 title="${isToday ? isRomanian ? "Ast\u0103zi" : "Today" : dayDate.toLocaleDateString()}">
+					<span class="day-number">${day}</span>
+					${isCompleted ? '<span class="checkmark">\u2713</span>' : ""}
+				</div>
+			`;
+    }
+    calendarHtml += "</div></div>";
+    return calendarHtml;
+  }
+  setupHabitsEventListeners() {
     const habitsList = this.containerEl.querySelector("#habitsList");
-    const habitCounter = this.containerEl.querySelector("#habitCounter");
-    if (!habitsList || !habitCounter)
+    if (!habitsList)
       return;
-    const isRomanian = this.plugin.settings.language === "ro";
-    const sortedHabits = this.habits.sort((a, b) => (a.order || 0) - (b.order || 0));
-    if (isRomanian) {
-      habitCounter.textContent = `${sortedHabits.length} ${sortedHabits.length !== 1 ? "obiceiuri" : "obicei"}`;
-    } else {
-      habitCounter.textContent = `${sortedHabits.length} ${sortedHabits.length !== 1 ? "habits" : "habit"}`;
-    }
-    if (sortedHabits.length === 0) {
-      habitsList.innerHTML = `
-				<div class="empty-habits">
-					<div class="empty-habits-icon">\u{1F3AF}</div>
-					<p>${this.plugin.settings.language === "ro" ? "Niciun obicei \xEEnc\u0103. Adaug\u0103 primul pentru a \xEEncepe!" : "No habits yet. Add your first to get started!"}</p>
-				</div>
-			`;
-      return;
-    }
-    const today = this.getLocalDateString(new Date());
-    const currentDate = new Date();
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-    habitsList.innerHTML = sortedHabits.map((habit) => {
-      this.updateHabitStreak(habit);
-      const weekDays = [];
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(startOfWeek);
-        date.setDate(startOfWeek.getDate() + i);
-        const dateStr = this.getLocalDateString(date);
-        const isCompleted = habit.completions[dateStr] || false;
-        const isToday = dateStr === today;
-        weekDays.push(`
-					<div class="habit-day ${isCompleted ? "completed" : ""} ${isToday ? "today" : ""}" 
-						 data-habit-id="${habit.id}" 
-						 data-date="${dateStr}"
-						 title="${date.toLocaleDateString("ro-RO", { weekday: "long", month: "long", day: "numeric" })}">
-						${date.getDate()}
-					</div>
-				`);
-      }
-      return `
-				<div class="habit-item" data-habit-id="${habit.id}" draggable="true">
-					<div class="drag-handle" title="${isRomanian ? "Trage\u021Bi pentru a reordona" : "Drag to reorder"}">\u22EE\u22EE</div>
-					<div class="habit-content">
-						<div class="habit-header">
-							<div class="habit-name" style="color: ${habit.color}">${habit.name}</div>
-							<div class="habit-streak">
-								<span class="streak-count">${habit.streak}</span>
-								<span class="streak-label">${isRomanian ? "zile" : "days"}</span>
-							</div>
-						</div>
-						<div class="habit-week">
-							${weekDays.join("")}
-						</div>
-					</div>
-					<div class="habit-actions">
-						<button class="habit-edit" data-habit-id="${habit.id}" title="${isRomanian ? "Editeaz\u0103" : "Edit"}">\u270F\uFE0F</button>
-						<button class="habit-delete" data-habit-id="${habit.id}" title="${isRomanian ? "\u0218terge" : "Delete"}">\xD7</button>
-					</div>
-				</div>
-			`;
-    }).join("");
-    habitsList.querySelectorAll(".habit-day").forEach((day) => {
-      day.addEventListener("click", async (e) => {
-        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
-        const date = e.target.getAttribute("data-date") || "";
+    habitsList.querySelectorAll(".habit-calendar-day:not(.empty):not(.future)").forEach((dayEl) => {
+      dayEl.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const habitId = parseInt(e.currentTarget.getAttribute("data-habit-id") || "0");
+        const date = e.currentTarget.getAttribute("data-date") || "";
         await this.toggleHabit(habitId, date);
+      });
+    });
+    habitsList.querySelectorAll(".habit-prev-month").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.navigateHabitsMonth(-1);
+      });
+    });
+    habitsList.querySelectorAll(".habit-next-month").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.navigateHabitsMonth(1);
       });
     });
     habitsList.querySelectorAll(".habit-delete").forEach((deleteBtn) => {
       deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
         this.confirmDeleteHabit(habitId);
       });
     });
     habitsList.querySelectorAll(".habit-edit").forEach((editBtn) => {
       editBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
         const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
         await this.editHabit(habitId);
       });
     });
+    this.setupHabitsReordering();
   }
-  setupHabitsDragAndDrop() {
+  navigateHabitsMonth(direction) {
+    this.currentHabitsMonth += direction;
+    if (this.currentHabitsMonth > 11) {
+      this.currentHabitsMonth = 0;
+      this.currentHabitsYear++;
+    } else if (this.currentHabitsMonth < 0) {
+      this.currentHabitsMonth = 11;
+      this.currentHabitsYear--;
+    }
+    this.renderHabits();
+  }
+  renderHabitsWithoutDragSetup() {
+    this.renderHabits();
+  }
+  setupHabitsReordering() {
     const habitsList = this.containerEl.querySelector("#habitsList");
     if (!habitsList)
       return;
-    const habitItems = habitsList.querySelectorAll(".habit-item");
-    let draggedElement = null;
-    let draggedHabitId = null;
-    habitItems.forEach((item) => {
-      const habitItem = item;
-      habitItem.addEventListener("dragstart", (e) => {
-        draggedElement = habitItem;
-        draggedHabitId = parseInt(habitItem.getAttribute("data-habit-id") || "0");
-        habitItem.classList.add("dragging");
-        if (e.dataTransfer) {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/html", habitItem.outerHTML);
-        }
-      });
-      habitItem.addEventListener("dragend", () => {
-        habitItem.classList.remove("dragging");
-        draggedElement = null;
-        draggedHabitId = null;
-      });
-      habitItem.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        if (e.dataTransfer) {
-          e.dataTransfer.dropEffect = "move";
-        }
-        if (draggedElement && draggedElement !== habitItem) {
-          const rect = habitItem.getBoundingClientRect();
-          const midY = rect.top + rect.height / 2;
-          if (e.clientY < midY) {
-            habitItem.classList.add("drop-above");
-            habitItem.classList.remove("drop-below");
-          } else {
-            habitItem.classList.add("drop-below");
-            habitItem.classList.remove("drop-above");
-          }
-        }
-      });
-      habitItem.addEventListener("dragleave", () => {
-        habitItem.classList.remove("drop-above", "drop-below");
-      });
-      habitItem.addEventListener("drop", (e) => {
-        e.preventDefault();
-        habitItem.classList.remove("drop-above", "drop-below");
-        if (draggedHabitId && draggedElement && draggedElement !== habitItem) {
-          const targetHabitId = parseInt(habitItem.getAttribute("data-habit-id") || "0");
-          this.reorderHabits(draggedHabitId, targetHabitId, e.clientY < habitItem.getBoundingClientRect().top + habitItem.getBoundingClientRect().height / 2);
-        }
+    habitsList.querySelectorAll(".habit-move-up").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
+        await this.moveHabitUp(habitId);
       });
     });
+    habitsList.querySelectorAll(".habit-move-down").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const habitId = parseInt(e.target.getAttribute("data-habit-id") || "0");
+        await this.moveHabitDown(habitId);
+      });
+    });
+  }
+  async moveHabitUp(habitId) {
+    const sortedHabits = this.habits.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const currentIndex = sortedHabits.findIndex((h) => h.id === habitId);
+    if (currentIndex <= 0)
+      return;
+    const temp = sortedHabits[currentIndex].order;
+    sortedHabits[currentIndex].order = sortedHabits[currentIndex - 1].order;
+    sortedHabits[currentIndex - 1].order = temp;
+    await this.saveData();
+    this.renderHabitsWithoutDragSetup();
+  }
+  async moveHabitDown(habitId) {
+    const sortedHabits = this.habits.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const currentIndex = sortedHabits.findIndex((h) => h.id === habitId);
+    if (currentIndex < 0 || currentIndex >= sortedHabits.length - 1)
+      return;
+    const temp = sortedHabits[currentIndex].order;
+    sortedHabits[currentIndex].order = sortedHabits[currentIndex + 1].order;
+    sortedHabits[currentIndex + 1].order = temp;
+    await this.saveData();
+    this.renderHabitsWithoutDragSetup();
   }
   async reorderHabits(draggedId, targetId, insertBefore) {
     const draggedHabit = this.habits.find((h) => h.id === draggedId);
