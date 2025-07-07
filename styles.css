@@ -4211,3 +4211,52 @@
 .mindfuldo-container[data-theme="midnight"] .drag-handle:hover {
   color: #E0E0E0;
 }
+
+.mindfuldo-container[data-theme="midnight"] .drag-handle:hover {
+  color: #E0E0E0;
+}
+
+/* Task Reorder Buttons */
+.task-reorder {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-right: 8px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.task-reorder:hover {
+    opacity: 1;
+}
+
+.task-move-up,
+.task-move-down {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    min-width: 20px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-move-up:hover:not(:disabled),
+.task-move-down:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    transform: scale(1.1);
+}
+
+.task-move-up:disabled,
+.task-move-down:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}

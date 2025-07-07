@@ -39,13 +39,13 @@ const DEFAULT_SETTINGS: RelaxingTodoSettings = {
 	pomodoroSessionsBeforeLongBreak: 4,
 	pomodoroAutoStartBreaks: false,
 	pomodoroAutoStartWork: false,
-	// Feature Toggles
+	// Feature Toggles - by default only tasks are enabled
 	enableTasks: true,
-	enableReminders: true,
-	enableHabits: true,
-	enableAnalytics: true,
-	enableCalendar: true,
-	enablePomodoro: true
+	enableReminders: false,
+	enableHabits: false,
+	enableAnalytics: false,
+	enableCalendar: false,
+	enablePomodoro: false
 }
 
 interface Task {
@@ -55,6 +55,7 @@ interface Task {
 	completed: boolean;
 	createdAt: string;
 	completedAt?: string;
+	order: number;
 }
 
 interface Reminder {
@@ -63,6 +64,7 @@ interface Reminder {
 	dateTime: string;
 	expired: boolean;
 	createdAt: string;
+	order: number;
 }
 
 interface Habit {
@@ -74,6 +76,7 @@ interface Habit {
 	streak: number;
 	bestStreak: number;
 	completions: { [date: string]: boolean }; // YYYY-MM-DD format
+	order: number;
 }
 
 export const VIEW_TYPE_RELAXING_TODO = "relaxing-todo-view";
@@ -81,7 +84,7 @@ export const VIEW_TYPE_RELAXING_TODO = "relaxing-todo-view";
 export default class RelaxingTodoPlugin extends Plugin {
 	settings: RelaxingTodoSettings;
 	private dataFilePath: string;
-	private lastDataUpdate: number = 0;
+	public lastDataUpdate: number = 0;
 
 	async onload() {
 		await this.loadSettings();
@@ -104,11 +107,11 @@ export default class RelaxingTodoPlugin extends Plugin {
 			})
 		);
 
-		// Periodic sync check (every 5 seconds) as a fallback
+		// Periodic sync check (every 3 seconds) as a fallback
 		this.registerInterval(
 			window.setInterval(() => {
 				this.checkForDataChanges();
-			}, 5000)
+			}, 3000)
 		);
 
 		// Adaugă icon în ribbon (sidebar stânga)
@@ -209,7 +212,7 @@ export default class RelaxingTodoPlugin extends Plugin {
 	private async handleDataFileChange() {
 		// Debounce rapid successive changes
 		const now = Date.now();
-		if (now - this.lastDataUpdate < 1000) {
+		if (now - this.lastDataUpdate < 3000) {
 			return;
 		}
 		this.lastDataUpdate = now;
@@ -218,7 +221,10 @@ export default class RelaxingTodoPlugin extends Plugin {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_RELAXING_TODO);
 		leaves.forEach(leaf => {
 			if (leaf.view instanceof RelaxingTodoView) {
-				leaf.view.syncWithExternalChanges();
+				// Only sync if not currently dragging or if sync is not disabled
+				if (!leaf.view.isDragging && !leaf.view.disableSync) {
+					leaf.view.syncWithExternalChanges();
+				}
 			}
 		});
 	}
@@ -254,6 +260,11 @@ export class RelaxingTodoView extends ItemView {
 
 	// Analytics State
 	private currentAnalyticsWeek: Date = new Date();
+	
+	// Sync control
+	private lastLocalUpdate: number = 0;
+	public isDragging: boolean = false;
+	public disableSync: boolean = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: RelaxingTodoPlugin) {
 		super(leaf);
@@ -324,6 +335,16 @@ export class RelaxingTodoView extends ItemView {
 		// Reload data from disk and refresh the current view
 		// This fixes the mobile-desktop sync issue for habits
 		try {
+			// Skip sync completely if disabled or if we're currently dragging or if we made recent local changes
+			const now = Date.now();
+			if (this.disableSync || this.isDragging || (now - this.lastLocalUpdate < 10000)) {
+				return;
+			}
+			
+			// Save current data first to ensure local changes are preserved
+			await this.saveData();
+			
+			// Then reload from disk to get any external changes
 			await this.loadData();
 			
 			// Update the display based on current view
@@ -348,7 +369,7 @@ export class RelaxingTodoView extends ItemView {
 					break;
 			}
 		} catch (error) {
-			console.log('MindfulDo: Error syncing external changes:', error);
+			console.error('MindfulDo: Error syncing external changes:', error);
 		}
 	}
 
@@ -1008,7 +1029,8 @@ export class RelaxingTodoView extends ItemView {
 			text: taskText,
 			completed: false,
 			category: this.currentCategory === 'toate' ? 'work' : this.currentCategory,
-			createdAt: this.getLocalDateString(new Date())
+			createdAt: this.getLocalDateString(new Date()),
+			order: this.tasks.length + 1
 		};
 
 		this.tasks.push(task);
@@ -1336,11 +1358,12 @@ export class RelaxingTodoView extends ItemView {
 			filteredTasks = this.tasks.filter(task => task.category === this.currentCategory);
 		}
 
-		// Sort tasks
+		// Sort tasks: first by completion status, then by order
 		filteredTasks.sort((a, b) => {
 			if (a.completed && !b.completed) return 1;
 			if (!a.completed && b.completed) return -1;
-			return 0;
+			// If same completion status, sort by order
+			return (a.order || 0) - (b.order || 0);
 		});
 
 		const completedTasks = this.tasks.filter(task => task.completed);
@@ -1362,8 +1385,12 @@ export class RelaxingTodoView extends ItemView {
 			return;
 		}
 
-		tasksList.innerHTML = filteredTasks.map(task => `
+		tasksList.innerHTML = filteredTasks.map((task, index) => `
 			<div class="task-item ${task.completed ? 'completed' : ''}" data-task-id="${task.id}">
+				<div class="task-reorder">
+					<button class="task-move-up" data-task-id="${task.id}" title="${isRomanian ? 'Mută în sus' : 'Move up'}" ${index === 0 ? 'disabled' : ''}>↑</button>
+					<button class="task-move-down" data-task-id="${task.id}" title="${isRomanian ? 'Mută în jos' : 'Move down'}" ${index === filteredTasks.length - 1 ? 'disabled' : ''}>↓</button>
+				</div>
 				<div class="task-checkbox ${task.completed ? 'checked' : ''}" data-task-id="${task.id}"></div>
 				<div class="task-text" data-task-id="${task.id}">${task.text}</div>
 				<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
@@ -1395,6 +1422,196 @@ export class RelaxingTodoView extends ItemView {
 				this.confirmDeleteTask(taskId);
 			});
 		});
+
+		// Add reorder functionality
+		this.setupTasksReordering();
+	}
+
+	private renderTasksWithoutDragSetup() {
+		const tasksList = this.containerEl.querySelector('#tasksList');
+		const taskCounter = this.containerEl.querySelector('#taskCounter');
+		const clearCompletedBtn = this.containerEl.querySelector('#clearCompleted') as HTMLElement;
+		
+		if (!tasksList || !taskCounter) return;
+
+		let filteredTasks = this.tasks;
+		if (this.currentCategory !== 'toate') {
+			filteredTasks = this.tasks.filter(task => task.category === this.currentCategory);
+		}
+
+		// Sort tasks: first by completion status, then by order
+		filteredTasks.sort((a, b) => {
+			if (a.completed && !b.completed) return 1;
+			if (!a.completed && b.completed) return -1;
+			// If same completion status, sort by order
+			return (a.order || 0) - (b.order || 0);
+		});
+
+		const completedTasks = this.tasks.filter(task => task.completed);
+		const activeTasks = this.tasks.filter(task => !task.completed);
+		
+		// Update counter
+		const isRomanian = this.plugin.settings.language === 'ro';
+		if (isRomanian) {
+			taskCounter.textContent = `${activeTasks.length} ${activeTasks.length !== 1 ? 'sarcini' : 'sarcină'}`;
+		} else {
+			taskCounter.textContent = `${activeTasks.length} ${activeTasks.length !== 1 ? 'tasks' : 'task'}`;
+		}
+		
+		// Show/hide clear completed button
+		clearCompletedBtn.style.display = completedTasks.length > 0 ? 'block' : 'none';
+
+		if (filteredTasks.length === 0) {
+			tasksList.innerHTML = '';
+			return;
+		}
+
+		tasksList.innerHTML = filteredTasks.map((task, index) => `
+			<div class="task-item ${task.completed ? 'completed' : ''}" data-task-id="${task.id}">
+				<div class="task-reorder">
+					<button class="task-move-up" data-task-id="${task.id}" title="${isRomanian ? 'Mută în sus' : 'Move up'}" ${index === 0 ? 'disabled' : ''}>↑</button>
+					<button class="task-move-down" data-task-id="${task.id}" title="${isRomanian ? 'Mută în jos' : 'Move down'}" ${index === filteredTasks.length - 1 ? 'disabled' : ''}>↓</button>
+				</div>
+				<div class="task-checkbox ${task.completed ? 'checked' : ''}" data-task-id="${task.id}"></div>
+				<div class="task-text" data-task-id="${task.id}">${task.text}</div>
+				<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
+				<div class="task-actions">
+					<button class="task-edit" data-task-id="${task.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
+					<button class="task-delete" data-task-id="${task.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
+				</div>
+			</div>
+		`).join('');
+
+		// Add event listeners for tasks
+		tasksList.querySelectorAll('.task-checkbox').forEach(checkbox => {
+			checkbox.addEventListener('click', (e) => {
+				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
+				this.toggleTask(taskId);
+			});
+		});
+
+		tasksList.querySelectorAll('.task-edit').forEach(editBtn => {
+			editBtn.addEventListener('click', (e) => {
+				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
+				this.editTask(taskId);
+			});
+		});
+
+		tasksList.querySelectorAll('.task-delete').forEach(deleteBtn => {
+			deleteBtn.addEventListener('click', (e) => {
+				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
+				this.confirmDeleteTask(taskId);
+			});
+		});
+
+		// Add reorder functionality
+		this.setupTasksReordering();
+	}
+
+	private setupTasksReordering() {
+		const tasksList = this.containerEl.querySelector('#tasksList');
+		if (!tasksList) return;
+
+		// Add event listeners for move up buttons
+		tasksList.querySelectorAll('.task-move-up').forEach(button => {
+			button.addEventListener('click', async (e) => {
+				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
+				await this.moveTaskUp(taskId);
+			});
+		});
+
+		// Add event listeners for move down buttons
+		tasksList.querySelectorAll('.task-move-down').forEach(button => {
+			button.addEventListener('click', async (e) => {
+				const taskId = parseInt((e.target as HTMLElement).getAttribute('data-task-id') || '0');
+				await this.moveTaskDown(taskId);
+			});
+		});
+	}
+
+	private async moveTaskUp(taskId: number) {
+		let filteredTasks = this.tasks;
+		if (this.currentCategory !== 'toate') {
+			filteredTasks = this.tasks.filter(task => task.category === this.currentCategory);
+		}
+
+		// Sort tasks: first by completion status, then by order
+		filteredTasks.sort((a, b) => {
+			if (a.completed && !b.completed) return 1;
+			if (!a.completed && b.completed) return -1;
+			return (a.order || 0) - (b.order || 0);
+		});
+
+		const currentIndex = filteredTasks.findIndex(task => task.id === taskId);
+		if (currentIndex > 0) {
+			const currentTask = filteredTasks[currentIndex];
+			const previousTask = filteredTasks[currentIndex - 1];
+			
+			// Swap order values
+			const tempOrder = currentTask.order;
+			currentTask.order = previousTask.order;
+			previousTask.order = tempOrder;
+
+			// Save and re-render
+			await this.saveData();
+			this.renderTasksWithoutDragSetup();
+		}
+	}
+
+	private async moveTaskDown(taskId: number) {
+		let filteredTasks = this.tasks;
+		if (this.currentCategory !== 'toate') {
+			filteredTasks = this.tasks.filter(task => task.category === this.currentCategory);
+		}
+
+		// Sort tasks: first by completion status, then by order
+		filteredTasks.sort((a, b) => {
+			if (a.completed && !b.completed) return 1;
+			if (!a.completed && b.completed) return -1;
+			return (a.order || 0) - (b.order || 0);
+		});
+
+		const currentIndex = filteredTasks.findIndex(task => task.id === taskId);
+		if (currentIndex < filteredTasks.length - 1) {
+			const currentTask = filteredTasks[currentIndex];
+			const nextTask = filteredTasks[currentIndex + 1];
+			
+			// Swap order values
+			const tempOrder = currentTask.order;
+			currentTask.order = nextTask.order;
+			nextTask.order = tempOrder;
+
+			// Save and re-render
+			await this.saveData();
+			this.renderTasksWithoutDragSetup();
+		}
+	}
+
+	private async reorderTasks(draggedId: number, targetId: number, insertBefore: boolean) {
+		const draggedTask = this.tasks.find(t => t.id === draggedId);
+		const targetTask = this.tasks.find(t => t.id === targetId);
+		
+		if (!draggedTask || !targetTask) return;
+
+		// Remove dragged task from array
+		const draggedIndex = this.tasks.indexOf(draggedTask);
+		this.tasks.splice(draggedIndex, 1);
+
+		// Find new position
+		const targetIndex = this.tasks.indexOf(targetTask);
+		const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+
+		// Insert at new position
+		this.tasks.splice(insertIndex, 0, draggedTask);
+
+		// Update order values
+		this.tasks.forEach((task, index) => {
+			task.order = index + 1;
+		});
+
+		// Save and re-render
+		await this.saveData();
+		this.renderTasks();
 	}
 
 	private getCategoryName(category: string): string {
@@ -1430,6 +1647,42 @@ export class RelaxingTodoView extends ItemView {
 		this.tasks = data?.tasks || [];
 		this.reminders = data?.reminders || [];
 		this.habits = data?.habits || [];
+
+		// Migrate existing data to add order property if missing
+		this.migrateDataToIncludeOrder();
+	}
+
+	private migrateDataToIncludeOrder() {
+		let needsSave = false;
+
+		// Add order to tasks if missing
+		this.tasks.forEach((task, index) => {
+			if (task.order === undefined) {
+				task.order = index + 1;
+				needsSave = true;
+			}
+		});
+
+		// Add order to reminders if missing
+		this.reminders.forEach((reminder, index) => {
+			if (reminder.order === undefined) {
+				reminder.order = index + 1;
+				needsSave = true;
+			}
+		});
+
+		// Add order to habits if missing
+		this.habits.forEach((habit, index) => {
+			if (habit.order === undefined) {
+				habit.order = index + 1;
+				needsSave = true;
+			}
+		});
+
+		// Save if we made any changes
+		if (needsSave) {
+			this.saveData();
+		}
 	}
 
 	private async saveData() {
@@ -1437,6 +1690,11 @@ export class RelaxingTodoView extends ItemView {
 		data.tasks = this.tasks;
 		data.reminders = this.reminders;
 		data.habits = this.habits;
+		
+		// Update timestamps to prevent sync conflicts
+		this.lastLocalUpdate = Date.now();
+		this.plugin.lastDataUpdate = Date.now();
+		
 		await this.plugin.saveData(data);
 	}
 
@@ -1523,7 +1781,8 @@ export class RelaxingTodoView extends ItemView {
 			text: text,
 			dateTime: dateTime,
 			expired: false,
-			createdAt: this.getLocalDateString(new Date())
+			createdAt: this.getLocalDateString(new Date()),
+			order: this.reminders.length + 1
 		};
 
 		this.reminders.push(newReminder);
@@ -1550,10 +1809,15 @@ export class RelaxingTodoView extends ItemView {
 
 		const isRomanian = this.plugin.settings.language === 'ro';
 
-		// Sortează reminder-urile: expirate la sfârșitul listei
+		// Sort reminders: expired at the end, then by order
 		const sortedReminders = this.reminders.sort((a, b) => {
 			if (a.expired && !b.expired) return 1;
 			if (!a.expired && b.expired) return -1;
+			// If same expiry status, sort by order, then by date
+			if (a.expired === b.expired) {
+				const orderDiff = (a.order || 0) - (b.order || 0);
+				if (orderDiff !== 0) return orderDiff;
+			}
 			return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
 		});
 
@@ -1580,7 +1844,8 @@ export class RelaxingTodoView extends ItemView {
 			const timeStr = reminderDate.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 			
 			return `
-				<div class="reminder-item ${reminder.expired ? 'expired' : ''}">
+				<div class="reminder-item ${reminder.expired ? 'expired' : ''}" data-reminder-id="${reminder.id}" draggable="true">
+					<div class="drag-handle" title="${isRomanian ? 'Trageți pentru a reordona' : 'Drag to reorder'}">⋮⋮</div>
 					<div class="reminder-content">
 						<div class="reminder-text">${reminder.text}</div>
 						<div class="reminder-time">${dateStr} la ${timeStr}</div>
@@ -1609,6 +1874,182 @@ export class RelaxingTodoView extends ItemView {
 				this.editReminder(reminderId);
 			});
 		});
+
+		// Add drag and drop functionality
+		this.setupRemindersDragAndDrop();
+	}
+
+	private renderRemindersWithoutDragSetup() {
+		const remindersList = this.containerEl.querySelector('#remindersList');
+		const reminderCounter = this.containerEl.querySelector('#reminderCounter');
+		
+		if (!remindersList || !reminderCounter) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+
+		// Sort reminders: expired at the end, then by order
+		const sortedReminders = this.reminders.sort((a, b) => {
+			if (a.expired && !b.expired) return 1;
+			if (!a.expired && b.expired) return -1;
+			// If same expiry status, sort by order, then by date
+			if (a.expired === b.expired) {
+				const orderDiff = (a.order || 0) - (b.order || 0);
+				if (orderDiff !== 0) return orderDiff;
+			}
+			return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
+		});
+
+		const activeReminders = this.reminders.filter(reminder => !reminder.expired);
+		if (isRomanian) {
+			reminderCounter.textContent = `${activeReminders.length} ${activeReminders.length !== 1 ? 'amintiri' : 'amintire'}`;
+		} else {
+			reminderCounter.textContent = `${activeReminders.length} ${activeReminders.length !== 1 ? 'reminders' : 'reminder'}`;
+		}
+
+		if (sortedReminders.length === 0) {
+			remindersList.innerHTML = `
+				<div class="empty-reminders">
+					<div class="empty-reminders-icon">⏰</div>
+					<p>${this.plugin.settings.language === 'ro' ? 'Nicio amintire încă. Adaugă prima pentru a începe!' : 'No reminders yet. Add your first to get started!'}</p>
+				</div>
+			`;
+			return;
+		}
+
+		remindersList.innerHTML = sortedReminders.map(reminder => {
+			const reminderDate = new Date(reminder.dateTime);
+			const dateStr = reminderDate.toLocaleDateString('ro-RO');
+			const timeStr = reminderDate.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+			
+			return `
+				<div class="reminder-item ${reminder.expired ? 'expired' : ''}" data-reminder-id="${reminder.id}" draggable="true">
+					<div class="drag-handle" title="${isRomanian ? 'Trageți pentru a reordona' : 'Drag to reorder'}">⋮⋮</div>
+					<div class="reminder-content">
+						<div class="reminder-text">${reminder.text}</div>
+						<div class="reminder-time">${dateStr} la ${timeStr}</div>
+						${reminder.expired ? `<div class="time-left expired">${this.plugin.settings.language === 'ro' ? 'Expirat' : 'Expired'}</div>` : ''}
+					</div>
+					<div class="reminder-actions">
+						<button class="reminder-edit" data-reminder-id="${reminder.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
+						<button class="reminder-delete" data-reminder-id="${reminder.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
+					</div>
+				</div>
+			`;
+		}).join('');
+
+		// Adaugă event listeners pentru ștergere
+		remindersList.querySelectorAll('.reminder-delete').forEach(deleteBtn => {
+			deleteBtn.addEventListener('click', (e) => {
+				const reminderId = parseInt((e.target as HTMLElement).getAttribute('data-reminder-id') || '0');
+				this.confirmDeleteReminder(reminderId);
+			});
+		});
+
+		// Adaugă event listeners pentru editare
+		remindersList.querySelectorAll('.reminder-edit').forEach(editBtn => {
+			editBtn.addEventListener('click', (e) => {
+				const reminderId = parseInt((e.target as HTMLElement).getAttribute('data-reminder-id') || '0');
+				this.editReminder(reminderId);
+			});
+		});
+
+	}
+
+	private setupRemindersDragAndDrop() {
+		const remindersList = this.containerEl.querySelector('#remindersList');
+		if (!remindersList) return;
+
+		const reminderItems = remindersList.querySelectorAll('.reminder-item');
+		let draggedElement: HTMLElement | null = null;
+		let draggedReminderId: number | null = null;
+
+		reminderItems.forEach(item => {
+			const reminderItem = item as HTMLElement;
+			
+			reminderItem.addEventListener('dragstart', (e) => {
+				this.isDragging = true;
+				draggedElement = reminderItem;
+				draggedReminderId = parseInt(reminderItem.getAttribute('data-reminder-id') || '0');
+				reminderItem.classList.add('dragging');
+				
+				// Set drag effect
+				if (e.dataTransfer) {
+					e.dataTransfer.effectAllowed = 'move';
+					e.dataTransfer.setData('text/html', reminderItem.outerHTML);
+				}
+			});
+
+			reminderItem.addEventListener('dragend', () => {
+				reminderItem.classList.remove('dragging');
+				draggedElement = null;
+				draggedReminderId = null;
+				// Reset dragging flag after a delay to allow drop to complete
+				setTimeout(() => {
+					this.isDragging = false;
+				}, 100);
+			});
+
+			reminderItem.addEventListener('dragover', (e) => {
+				e.preventDefault();
+				if (e.dataTransfer) {
+					e.dataTransfer.dropEffect = 'move';
+				}
+				
+				if (draggedElement && draggedElement !== reminderItem) {
+					const rect = reminderItem.getBoundingClientRect();
+					const midY = rect.top + rect.height / 2;
+					
+					if (e.clientY < midY) {
+						reminderItem.classList.add('drop-above');
+						reminderItem.classList.remove('drop-below');
+					} else {
+						reminderItem.classList.add('drop-below');
+						reminderItem.classList.remove('drop-above');
+					}
+				}
+			});
+
+			reminderItem.addEventListener('dragleave', () => {
+				reminderItem.classList.remove('drop-above', 'drop-below');
+			});
+
+			reminderItem.addEventListener('drop', (e) => {
+				e.preventDefault();
+				reminderItem.classList.remove('drop-above', 'drop-below');
+				
+				if (draggedReminderId && draggedElement && draggedElement !== reminderItem) {
+					const targetReminderId = parseInt(reminderItem.getAttribute('data-reminder-id') || '0');
+					this.reorderReminders(draggedReminderId, targetReminderId, e.clientY < reminderItem.getBoundingClientRect().top + reminderItem.getBoundingClientRect().height / 2);
+				}
+			});
+		});
+	}
+
+	private async reorderReminders(draggedId: number, targetId: number, insertBefore: boolean) {
+		const draggedReminder = this.reminders.find(r => r.id === draggedId);
+		const targetReminder = this.reminders.find(r => r.id === targetId);
+		
+		if (!draggedReminder || !targetReminder) return;
+
+		// Remove dragged reminder from array
+		const draggedIndex = this.reminders.indexOf(draggedReminder);
+		this.reminders.splice(draggedIndex, 1);
+
+		// Find new position
+		const targetIndex = this.reminders.indexOf(targetReminder);
+		const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+
+		// Insert at new position
+		this.reminders.splice(insertIndex, 0, draggedReminder);
+
+		// Update order values
+		this.reminders.forEach((reminder, index) => {
+			reminder.order = index + 1;
+		});
+
+		// Save and re-render
+		await this.saveData();
+		this.renderRemindersWithoutDragSetup();
 	}
 
 	private editReminder(id: number) {
@@ -1756,7 +2197,8 @@ export class RelaxingTodoView extends ItemView {
 			createdAt: this.getLocalDateString(new Date()),
 			streak: 0,
 			bestStreak: 0,
-			completions: {}
+			completions: {},
+			order: this.habits.length + 1
 		};
 		this.habits.push(habit);
 		await this.saveData();
@@ -1872,6 +2314,10 @@ export class RelaxingTodoView extends ItemView {
 			habitsList.innerHTML = '';
 			return;
 		}
+
+		// Sort habits by order
+		const sortedHabits = [...this.habits].sort((a, b) => (a.order || 0) - (b.order || 0));
+
 		// Generate habit cards with last 7 days tracking
 		const today = new Date();
 		const days: Date[] = [];
@@ -1883,7 +2329,7 @@ export class RelaxingTodoView extends ItemView {
 
 		const dayLabels = isRomanian ? ['D', 'L', 'M', 'M', 'J', 'V', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-		const newHtml = this.habits.map(habit => {
+		const newHtml = sortedHabits.map(habit => {
 			const dayCircles = days.map((date, index) => {
 				const dateStr = this.getLocalDateString(date);
 				const isCompleted = habit.completions[dateStr] || false;
@@ -1905,7 +2351,8 @@ export class RelaxingTodoView extends ItemView {
 			}).join('');
 
 			return `
-				<div class="habit-item">
+				<div class="habit-item" data-habit-id="${habit.id}" draggable="true">
+					<div class="drag-handle" title="${isRomanian ? 'Trageți pentru a reordona' : 'Drag to reorder'}">⋮⋮</div>
 					<div class="habit-header">
 						<div class="habit-info">
 							<div class="habit-name" style="color: ${habit.color};">${habit.name}</div>
@@ -1955,6 +2402,207 @@ export class RelaxingTodoView extends ItemView {
 				await this.editHabit(habitId);
 			});
 		});
+
+		// Add drag and drop functionality
+		this.setupHabitsDragAndDrop();
+	}
+
+	private renderHabitsWithoutDragSetup() {
+		const habitsList = this.containerEl.querySelector('#habitsList');
+		const habitCounter = this.containerEl.querySelector('#habitCounter');
+		
+		if (!habitsList || !habitCounter) return;
+
+		const isRomanian = this.plugin.settings.language === 'ro';
+
+		// Sort habits by order
+		const sortedHabits = this.habits.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+		if (isRomanian) {
+			habitCounter.textContent = `${sortedHabits.length} ${sortedHabits.length !== 1 ? 'obiceiuri' : 'obicei'}`;
+		} else {
+			habitCounter.textContent = `${sortedHabits.length} ${sortedHabits.length !== 1 ? 'habits' : 'habit'}`;
+		}
+
+		if (sortedHabits.length === 0) {
+			habitsList.innerHTML = `
+				<div class="empty-habits">
+					<div class="empty-habits-icon">🎯</div>
+					<p>${this.plugin.settings.language === 'ro' ? 'Niciun obicei încă. Adaugă primul pentru a începe!' : 'No habits yet. Add your first to get started!'}</p>
+				</div>
+			`;
+			return;
+		}
+
+		// Get current date for habit tracking
+		const today = this.getLocalDateString(new Date());
+		const currentDate = new Date();
+		const startOfWeek = new Date(currentDate);
+		startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+
+		habitsList.innerHTML = sortedHabits.map(habit => {
+			// Calculate streak
+			this.updateHabitStreak(habit);
+			
+			// Generate week days
+			const weekDays = [];
+			for (let i = 0; i < 7; i++) {
+				const date = new Date(startOfWeek);
+				date.setDate(startOfWeek.getDate() + i);
+				const dateStr = this.getLocalDateString(date);
+				const isCompleted = habit.completions[dateStr] || false;
+				const isToday = dateStr === today;
+				
+				weekDays.push(`
+					<div class="habit-day ${isCompleted ? 'completed' : ''} ${isToday ? 'today' : ''}" 
+						 data-habit-id="${habit.id}" 
+						 data-date="${dateStr}"
+						 title="${date.toLocaleDateString('ro-RO', { weekday: 'long', month: 'long', day: 'numeric' })}">
+						${date.getDate()}
+					</div>
+				`);
+			}
+
+			return `
+				<div class="habit-item" data-habit-id="${habit.id}" draggable="true">
+					<div class="drag-handle" title="${isRomanian ? 'Trageți pentru a reordona' : 'Drag to reorder'}">⋮⋮</div>
+					<div class="habit-content">
+						<div class="habit-header">
+							<div class="habit-name" style="color: ${habit.color}">${habit.name}</div>
+							<div class="habit-streak">
+								<span class="streak-count">${habit.streak}</span>
+								<span class="streak-label">${isRomanian ? 'zile' : 'days'}</span>
+							</div>
+						</div>
+						<div class="habit-week">
+							${weekDays.join('')}
+						</div>
+					</div>
+					<div class="habit-actions">
+						<button class="habit-edit" data-habit-id="${habit.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
+						<button class="habit-delete" data-habit-id="${habit.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
+					</div>
+				</div>
+			`;
+		}).join('');
+
+		// Add event listeners for habit days
+		habitsList.querySelectorAll('.habit-day').forEach(day => {
+			day.addEventListener('click', async (e) => {
+				const habitId = parseInt((e.target as HTMLElement).getAttribute('data-habit-id') || '0');
+				const date = (e.target as HTMLElement).getAttribute('data-date') || '';
+				await this.toggleHabit(habitId, date);
+			});
+		});
+
+		// Add event listeners for delete buttons
+		habitsList.querySelectorAll('.habit-delete').forEach(deleteBtn => {
+			deleteBtn.addEventListener('click', (e) => {
+				const habitId = parseInt((e.target as HTMLElement).getAttribute('data-habit-id') || '0');
+				this.confirmDeleteHabit(habitId);
+			});
+		});
+
+		// Add event listeners for edit buttons
+		habitsList.querySelectorAll('.habit-edit').forEach(editBtn => {
+			editBtn.addEventListener('click', async (e) => {
+				const habitId = parseInt((e.target as HTMLElement).getAttribute('data-habit-id') || '0');
+				await this.editHabit(habitId);
+			});
+		});
+
+	}
+
+	private setupHabitsDragAndDrop() {
+		const habitsList = this.containerEl.querySelector('#habitsList');
+		if (!habitsList) return;
+
+		const habitItems = habitsList.querySelectorAll('.habit-item');
+		let draggedElement: HTMLElement | null = null;
+		let draggedHabitId: number | null = null;
+
+		habitItems.forEach(item => {
+			const habitItem = item as HTMLElement;
+			
+			habitItem.addEventListener('dragstart', (e) => {
+				draggedElement = habitItem;
+				draggedHabitId = parseInt(habitItem.getAttribute('data-habit-id') || '0');
+				habitItem.classList.add('dragging');
+				
+				// Set drag effect
+				if (e.dataTransfer) {
+					e.dataTransfer.effectAllowed = 'move';
+					e.dataTransfer.setData('text/html', habitItem.outerHTML);
+				}
+			});
+
+			habitItem.addEventListener('dragend', () => {
+				habitItem.classList.remove('dragging');
+				draggedElement = null;
+				draggedHabitId = null;
+			});
+
+			habitItem.addEventListener('dragover', (e) => {
+				e.preventDefault();
+				if (e.dataTransfer) {
+					e.dataTransfer.dropEffect = 'move';
+				}
+				
+				if (draggedElement && draggedElement !== habitItem) {
+					const rect = habitItem.getBoundingClientRect();
+					const midY = rect.top + rect.height / 2;
+					
+					if (e.clientY < midY) {
+						habitItem.classList.add('drop-above');
+						habitItem.classList.remove('drop-below');
+					} else {
+						habitItem.classList.add('drop-below');
+						habitItem.classList.remove('drop-above');
+					}
+				}
+			});
+
+			habitItem.addEventListener('dragleave', () => {
+				habitItem.classList.remove('drop-above', 'drop-below');
+			});
+
+			habitItem.addEventListener('drop', (e) => {
+				e.preventDefault();
+				habitItem.classList.remove('drop-above', 'drop-below');
+				
+				if (draggedHabitId && draggedElement && draggedElement !== habitItem) {
+					const targetHabitId = parseInt(habitItem.getAttribute('data-habit-id') || '0');
+					this.reorderHabits(draggedHabitId, targetHabitId, e.clientY < habitItem.getBoundingClientRect().top + habitItem.getBoundingClientRect().height / 2);
+				}
+			});
+		});
+	}
+
+	private async reorderHabits(draggedId: number, targetId: number, insertBefore: boolean) {
+		const draggedHabit = this.habits.find(h => h.id === draggedId);
+		const targetHabit = this.habits.find(h => h.id === targetId);
+		
+		if (!draggedHabit || !targetHabit) return;
+
+		// Remove dragged habit from array
+		const draggedIndex = this.habits.indexOf(draggedHabit);
+		this.habits.splice(draggedIndex, 1);
+
+		// Find new position
+		const targetIndex = this.habits.indexOf(targetHabit);
+		const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+
+		// Insert at new position
+		this.habits.splice(insertIndex, 0, draggedHabit);
+
+		// Update order values
+		this.habits.forEach((habit, index) => {
+			habit.order = index + 1;
+		});
+
+		// Save and re-render
+		await this.saveData();
+		this.renderHabitsWithoutDragSetup();
 	}
 
 	private async editHabit(id: number) {
