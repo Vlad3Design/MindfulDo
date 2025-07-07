@@ -877,6 +877,7 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       order: this.tasks.length + 1
     };
     this.tasks.push(task);
+    this.normalizeOrderValues();
     await this.saveData();
     taskInput.value = "";
     taskInput.style.transform = "scale(0.99)";
@@ -1219,21 +1220,31 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
       tasksList.innerHTML = "";
       return;
     }
-    tasksList.innerHTML = filteredTasks.map((task, index) => `
-			<div class="task-item ${task.completed ? "completed" : ""}" data-task-id="${task.id}">
-				<div class="task-reorder">
-					<button class="task-move-up" data-task-id="${task.id}" title="${isRomanian ? "Mut\u0103 \xEEn sus" : "Move up"}" ${index === 0 ? "disabled" : ""}>\u2191</button>
-					<button class="task-move-down" data-task-id="${task.id}" title="${isRomanian ? "Mut\u0103 \xEEn jos" : "Move down"}" ${index === filteredTasks.length - 1 ? "disabled" : ""}>\u2193</button>
+    tasksList.innerHTML = filteredTasks.map((task, index) => {
+      let reorderableGroup = this.tasks.filter((t) => t.completed === task.completed);
+      if (this.currentCategory !== "toate") {
+        reorderableGroup = reorderableGroup.filter((t) => t.category === this.currentCategory);
+      }
+      reorderableGroup.sort((a, b) => (a.order || 0) - (b.order || 0));
+      const reorderableIndex = reorderableGroup.findIndex((t) => t.id === task.id);
+      const canMoveUp = reorderableIndex > 0;
+      const canMoveDown = reorderableIndex < reorderableGroup.length - 1;
+      return `
+				<div class="task-item ${task.completed ? "completed" : ""}" data-task-id="${task.id}">
+					<div class="task-reorder">
+						<button class="task-move-up" data-task-id="${task.id}" title="${isRomanian ? "Mut\u0103 \xEEn sus" : "Move up"}" ${!canMoveUp ? "disabled" : ""}>\u2191</button>
+						<button class="task-move-down" data-task-id="${task.id}" title="${isRomanian ? "Mut\u0103 \xEEn jos" : "Move down"}" ${!canMoveDown ? "disabled" : ""}>\u2193</button>
+					</div>
+					<div class="task-checkbox ${task.completed ? "checked" : ""}" data-task-id="${task.id}"></div>
+					<div class="task-text" data-task-id="${task.id}">${task.text}</div>
+					<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
+					<div class="task-actions">
+						<button class="task-edit" data-task-id="${task.id}" title="${isRomanian ? "Editeaz\u0103" : "Edit"}">\u270F\uFE0F</button>
+						<button class="task-delete" data-task-id="${task.id}" title="${isRomanian ? "\u0218terge" : "Delete"}">\xD7</button>
+					</div>
 				</div>
-				<div class="task-checkbox ${task.completed ? "checked" : ""}" data-task-id="${task.id}"></div>
-				<div class="task-text" data-task-id="${task.id}">${task.text}</div>
-				<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
-				<div class="task-actions">
-					<button class="task-edit" data-task-id="${task.id}" title="${isRomanian ? "Editeaz\u0103" : "Edit"}">\u270F\uFE0F</button>
-					<button class="task-delete" data-task-id="${task.id}" title="${isRomanian ? "\u0218terge" : "Delete"}">\xD7</button>
-				</div>
-			</div>
-		`).join("");
+			`;
+    }).join("");
     tasksList.querySelectorAll(".task-checkbox").forEach((checkbox) => {
       checkbox.addEventListener("click", (e) => {
         const taskId = parseInt(e.target.getAttribute("data-task-id") || "0");
@@ -1272,50 +1283,44 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
     });
   }
   async moveTaskUp(taskId) {
-    let filteredTasks = this.tasks;
+    const currentTask = this.tasks.find((task) => task.id === taskId);
+    if (!currentTask)
+      return;
+    let reorderableTasks = this.tasks.filter((task) => task.completed === currentTask.completed);
     if (this.currentCategory !== "toate") {
-      filteredTasks = this.tasks.filter((task) => task.category === this.currentCategory);
+      reorderableTasks = reorderableTasks.filter((task) => task.category === this.currentCategory);
     }
-    filteredTasks.sort((a, b) => {
-      if (a.completed && !b.completed)
-        return 1;
-      if (!a.completed && b.completed)
-        return -1;
-      return (a.order || 0) - (b.order || 0);
-    });
-    const currentIndex = filteredTasks.findIndex((task) => task.id === taskId);
-    if (currentIndex > 0) {
-      const currentTask = filteredTasks[currentIndex];
-      const previousTask = filteredTasks[currentIndex - 1];
-      const tempOrder = currentTask.order;
-      currentTask.order = previousTask.order;
-      previousTask.order = tempOrder;
-      await this.saveData();
-      this.renderTasksWithoutDragSetup();
-    }
+    reorderableTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const currentIndex = reorderableTasks.findIndex((task) => task.id === taskId);
+    if (currentIndex <= 0)
+      return;
+    const previousTask = reorderableTasks[currentIndex - 1];
+    const tempOrder = currentTask.order;
+    currentTask.order = previousTask.order;
+    previousTask.order = tempOrder;
+    this.normalizeOrderValues();
+    await this.saveData();
+    this.renderTasksWithoutDragSetup();
   }
   async moveTaskDown(taskId) {
-    let filteredTasks = this.tasks;
+    const currentTask = this.tasks.find((task) => task.id === taskId);
+    if (!currentTask)
+      return;
+    let reorderableTasks = this.tasks.filter((task) => task.completed === currentTask.completed);
     if (this.currentCategory !== "toate") {
-      filteredTasks = this.tasks.filter((task) => task.category === this.currentCategory);
+      reorderableTasks = reorderableTasks.filter((task) => task.category === this.currentCategory);
     }
-    filteredTasks.sort((a, b) => {
-      if (a.completed && !b.completed)
-        return 1;
-      if (!a.completed && b.completed)
-        return -1;
-      return (a.order || 0) - (b.order || 0);
-    });
-    const currentIndex = filteredTasks.findIndex((task) => task.id === taskId);
-    if (currentIndex < filteredTasks.length - 1) {
-      const currentTask = filteredTasks[currentIndex];
-      const nextTask = filteredTasks[currentIndex + 1];
-      const tempOrder = currentTask.order;
-      currentTask.order = nextTask.order;
-      nextTask.order = tempOrder;
-      await this.saveData();
-      this.renderTasksWithoutDragSetup();
-    }
+    reorderableTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const currentIndex = reorderableTasks.findIndex((task) => task.id === taskId);
+    if (currentIndex >= reorderableTasks.length - 1)
+      return;
+    const nextTask = reorderableTasks[currentIndex + 1];
+    const tempOrder = currentTask.order;
+    currentTask.order = nextTask.order;
+    nextTask.order = tempOrder;
+    this.normalizeOrderValues();
+    await this.saveData();
+    this.renderTasksWithoutDragSetup();
   }
   async reorderTasks(draggedId, targetId, insertBefore) {
     const draggedTask = this.tasks.find((t) => t.id === draggedId);
@@ -1384,9 +1389,30 @@ var RelaxingTodoView = class extends import_obsidian.ItemView {
         needsSave = true;
       }
     });
+    this.normalizeOrderValues();
     if (needsSave) {
       this.saveData();
     }
+  }
+  normalizeOrderValues() {
+    const incompleTasks = this.tasks.filter((task) => !task.completed);
+    const completedTasks = this.tasks.filter((task) => task.completed);
+    incompleTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    incompleTasks.forEach((task, index) => {
+      task.order = index + 1;
+    });
+    completedTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    completedTasks.forEach((task, index) => {
+      task.order = index + 1;
+    });
+    this.reminders.sort((a, b) => (a.order || 0) - (b.order || 0));
+    this.reminders.forEach((reminder, index) => {
+      reminder.order = index + 1;
+    });
+    this.habits.sort((a, b) => (a.order || 0) - (b.order || 0));
+    this.habits.forEach((habit, index) => {
+      habit.order = index + 1;
+    });
   }
   async saveData() {
     const data = await this.plugin.loadData() || {};
