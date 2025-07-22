@@ -1,9 +1,9 @@
 {
 	"id": "mindfuldo",
 	"name": "MindfulDo",
-	"version": "1.2.9.3",
+	"version": "1.2.9.4",
 	"minAppVersion": "1.6.0",
-	"description": "MindfulDo - Do mindfully",
+	"description": "MindfulDo - Do mindfully.",
 	"author": "Vlad 3Design",
 	"authorUrl": "",
 	"fundingUrl": "",

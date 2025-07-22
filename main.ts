@@ -475,6 +475,10 @@ export class RelaxingTodoView extends ItemView {
 								<div class="color-option" data-color="#E91E63" style="background: #E91E63;"></div>
 								<div class="color-option" data-color="#9C27B0" style="background: #9C27B0;"></div>
 								<div class="color-option" data-color="#00BCD4" style="background: #00BCD4;"></div>
+								<div class="color-option custom-color-option" data-color="custom" style="background: transparent; border: 1.5px dashed #aaa; position: relative;">
+									<input type="color" id="customHabitColor" style="opacity:0;position:absolute;left:0;top:0;width:100%;height:100%;cursor:pointer;">
+									<span style="position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.2em;pointer-events:none;">+</span>
+								</div>
 							</div>
 						</div>
 
@@ -983,6 +987,23 @@ export class RelaxingTodoView extends ItemView {
 		nextWeekBtn?.addEventListener('click', () => {
 			this.navigateToNextWeek();
 		});
+
+		// Color picker custom
+		const customColorInput = this.containerEl.querySelector('#customHabitColor') as HTMLInputElement;
+		const customColorOption = this.containerEl.querySelector('.custom-color-option') as HTMLElement;
+		if (customColorInput && customColorOption) {
+			customColorInput.addEventListener('input', (e) => {
+				const color = (e.target as HTMLInputElement).value;
+				customColorOption.setAttribute('data-color', color);
+				customColorOption.style.background = color;
+				// Setează ca activ
+				this.containerEl.querySelectorAll('.color-option').forEach(btn => btn.classList.remove('active'));
+				customColorOption.classList.add('active');
+			});
+			customColorOption.addEventListener('click', () => {
+				customColorInput.click();
+			});
+		}
 	}
 
 	private updateDateTime() {
@@ -1030,10 +1051,15 @@ export class RelaxingTodoView extends ItemView {
 			completed: false,
 			category: this.currentCategory === 'toate' ? 'work' : this.currentCategory,
 			createdAt: this.getLocalDateString(new Date()),
-			order: this.tasks.length + 1
+			order: 1 // va fi primul
 		};
 
-		this.tasks.push(task);
+		// Adaugă task-ul la începutul listei
+		this.tasks.unshift(task);
+		
+		// Normalizez valorile order pentru a păstra consistența
+		this.normalizeOrderValues();
+		
 		await this.saveData();
 		
 		taskInput.value = '';
@@ -1466,21 +1492,34 @@ export class RelaxingTodoView extends ItemView {
 			return;
 		}
 
-		tasksList.innerHTML = filteredTasks.map((task, index) => `
-			<div class="task-item ${task.completed ? 'completed' : ''}" data-task-id="${task.id}">
-				<div class="task-reorder">
-					<button class="task-move-up" data-task-id="${task.id}" title="${isRomanian ? 'Mută în sus' : 'Move up'}" ${index === 0 ? 'disabled' : ''}>↑</button>
-					<button class="task-move-down" data-task-id="${task.id}" title="${isRomanian ? 'Mută în jos' : 'Move down'}" ${index === filteredTasks.length - 1 ? 'disabled' : ''}>↓</button>
+		tasksList.innerHTML = filteredTasks.map((task, index) => {
+			// Calculate reorderable group for this task to determine button states
+			let reorderableGroup = this.tasks.filter(t => t.completed === task.completed);
+			if (this.currentCategory !== 'toate') {
+				reorderableGroup = reorderableGroup.filter(t => t.category === this.currentCategory);
+			}
+			reorderableGroup.sort((a, b) => (a.order || 0) - (b.order || 0));
+			
+			const reorderableIndex = reorderableGroup.findIndex(t => t.id === task.id);
+			const canMoveUp = reorderableIndex > 0;
+			const canMoveDown = reorderableIndex < reorderableGroup.length - 1;
+			
+			return `
+				<div class="task-item ${task.completed ? 'completed' : ''}" data-task-id="${task.id}">
+					<div class="task-reorder">
+						<button class="task-move-up" data-task-id="${task.id}" title="${isRomanian ? 'Mută în sus' : 'Move up'}" ${!canMoveUp ? 'disabled' : ''}>↑</button>
+						<button class="task-move-down" data-task-id="${task.id}" title="${isRomanian ? 'Mută în jos' : 'Move down'}" ${!canMoveDown ? 'disabled' : ''}>↓</button>
+					</div>
+					<div class="task-checkbox ${task.completed ? 'checked' : ''}" data-task-id="${task.id}"></div>
+					<div class="task-text" data-task-id="${task.id}">${task.text}</div>
+					<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
+					<div class="task-actions">
+						<button class="task-edit" data-task-id="${task.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
+						<button class="task-delete" data-task-id="${task.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
+					</div>
 				</div>
-				<div class="task-checkbox ${task.completed ? 'checked' : ''}" data-task-id="${task.id}"></div>
-				<div class="task-text" data-task-id="${task.id}">${task.text}</div>
-				<div class="task-category ${task.category}" data-task-id="${task.id}">${this.getCategoryName(task.category)}</div>
-				<div class="task-actions">
-					<button class="task-edit" data-task-id="${task.id}" title="${isRomanian ? 'Editează' : 'Edit'}">✏️</button>
-					<button class="task-delete" data-task-id="${task.id}" title="${isRomanian ? 'Șterge' : 'Delete'}">×</button>
-				</div>
-			</div>
-		`).join('');
+			`;
+		}).join('');
 
 		// Add event listeners for tasks
 		tasksList.querySelectorAll('.task-checkbox').forEach(checkbox => {
@@ -1530,61 +1569,71 @@ export class RelaxingTodoView extends ItemView {
 	}
 
 	private async moveTaskUp(taskId: number) {
-		let filteredTasks = this.tasks;
+		// Get all tasks that should be reorderable (same completion status and category if filtered)
+		const currentTask = this.tasks.find(task => task.id === taskId);
+		if (!currentTask) return;
+
+		let reorderableTasks = this.tasks.filter(task => task.completed === currentTask.completed);
+		
+		// If we're in a filtered category, only include tasks from that category
 		if (this.currentCategory !== 'toate') {
-			filteredTasks = this.tasks.filter(task => task.category === this.currentCategory);
+			reorderableTasks = reorderableTasks.filter(task => task.category === this.currentCategory);
 		}
 
-		// Sort tasks: first by completion status, then by order
-		filteredTasks.sort((a, b) => {
-			if (a.completed && !b.completed) return 1;
-			if (!a.completed && b.completed) return -1;
-			return (a.order || 0) - (b.order || 0);
-		});
+		// Sort by current order
+		reorderableTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
 
-		const currentIndex = filteredTasks.findIndex(task => task.id === taskId);
-		if (currentIndex > 0) {
-			const currentTask = filteredTasks[currentIndex];
-			const previousTask = filteredTasks[currentIndex - 1];
-			
-			// Swap order values
-			const tempOrder = currentTask.order;
-			currentTask.order = previousTask.order;
-			previousTask.order = tempOrder;
+		const currentIndex = reorderableTasks.findIndex(task => task.id === taskId);
+		
+		// Can't move up if it's already first
+		if (currentIndex <= 0) return;
 
-			// Save and re-render
-			await this.saveData();
-			this.renderTasksWithoutDragSetup();
-		}
+		// Swap with the previous task
+		const previousTask = reorderableTasks[currentIndex - 1];
+		const tempOrder = currentTask.order;
+		currentTask.order = previousTask.order;
+		previousTask.order = tempOrder;
+
+		// Normalize order values to prevent inconsistencies
+		this.normalizeOrderValues();
+
+		// Save and re-render
+		await this.saveData();
+		this.renderTasksWithoutDragSetup();
 	}
 
 	private async moveTaskDown(taskId: number) {
-		let filteredTasks = this.tasks;
+		// Get all tasks that should be reorderable (same completion status and category if filtered)
+		const currentTask = this.tasks.find(task => task.id === taskId);
+		if (!currentTask) return;
+
+		let reorderableTasks = this.tasks.filter(task => task.completed === currentTask.completed);
+		
+		// If we're in a filtered category, only include tasks from that category
 		if (this.currentCategory !== 'toate') {
-			filteredTasks = this.tasks.filter(task => task.category === this.currentCategory);
+			reorderableTasks = reorderableTasks.filter(task => task.category === this.currentCategory);
 		}
 
-		// Sort tasks: first by completion status, then by order
-		filteredTasks.sort((a, b) => {
-			if (a.completed && !b.completed) return 1;
-			if (!a.completed && b.completed) return -1;
-			return (a.order || 0) - (b.order || 0);
-		});
+		// Sort by current order
+		reorderableTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
 
-		const currentIndex = filteredTasks.findIndex(task => task.id === taskId);
-		if (currentIndex < filteredTasks.length - 1) {
-			const currentTask = filteredTasks[currentIndex];
-			const nextTask = filteredTasks[currentIndex + 1];
-			
-			// Swap order values
-			const tempOrder = currentTask.order;
-			currentTask.order = nextTask.order;
-			nextTask.order = tempOrder;
+		const currentIndex = reorderableTasks.findIndex(task => task.id === taskId);
+		
+		// Can't move down if it's already last
+		if (currentIndex >= reorderableTasks.length - 1) return;
 
-			// Save and re-render
-			await this.saveData();
-			this.renderTasksWithoutDragSetup();
-		}
+		// Swap with the next task
+		const nextTask = reorderableTasks[currentIndex + 1];
+		const tempOrder = currentTask.order;
+		currentTask.order = nextTask.order;
+		nextTask.order = tempOrder;
+
+		// Normalize order values to prevent inconsistencies
+		this.normalizeOrderValues();
+
+		// Save and re-render
+		await this.saveData();
+		this.renderTasksWithoutDragSetup();
 	}
 
 	private async reorderTasks(draggedId: number, targetId: number, insertBefore: boolean) {
@@ -1679,10 +1728,43 @@ export class RelaxingTodoView extends ItemView {
 			}
 		});
 
+		// Normalize order values to prevent duplicates
+		this.normalizeOrderValues();
+
 		// Save if we made any changes
 		if (needsSave) {
 			this.saveData();
 		}
+	}
+
+	private normalizeOrderValues() {
+		// Normalize tasks order values by completion status and category
+		const incompleTasks = this.tasks.filter(task => !task.completed);
+		const completedTasks = this.tasks.filter(task => task.completed);
+		
+		// Sort and reassign order for incomplete tasks
+		incompleTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+		incompleTasks.forEach((task, index) => {
+			task.order = index + 1;
+		});
+		
+		// Sort and reassign order for completed tasks  
+		completedTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+		completedTasks.forEach((task, index) => {
+			task.order = index + 1;
+		});
+
+		// Normalize reminders order values
+		this.reminders.sort((a, b) => (a.order || 0) - (b.order || 0));
+		this.reminders.forEach((reminder, index) => {
+			reminder.order = index + 1;
+		});
+
+		// Normalize habits order values
+		this.habits.sort((a, b) => (a.order || 0) - (b.order || 0));
+		this.habits.forEach((habit, index) => {
+			habit.order = index + 1;
+		});
 	}
 
 	private async saveData() {
@@ -2189,7 +2271,13 @@ export class RelaxingTodoView extends ItemView {
 		const habitName = habitNameInput.value.trim();
 		if (habitName === '') return;
 		const selectedColor = this.containerEl.querySelector('.color-option.active') as HTMLElement;
-		const color = selectedColor?.getAttribute('data-color') || '#4CAF50';
+		let color = selectedColor?.getAttribute('data-color') || '#4CAF50';
+		if (color === 'custom') {
+			const customColorInput = this.containerEl.querySelector('#customHabitColor') as HTMLInputElement;
+			if (customColorInput && customColorInput.value) {
+				color = customColorInput.value;
+			}
+		}
 		const habit: Habit = {
 			id: Date.now(),
 			name: habitName,
@@ -2616,6 +2704,10 @@ export class RelaxingTodoView extends ItemView {
 							<div class="color-option ${habit.color === '#E91E63' ? 'active' : ''}" data-color="#E91E63" style="background: #E91E63;"></div>
 							<div class="color-option ${habit.color === '#9C27B0' ? 'active' : ''}" data-color="#9C27B0" style="background: #9C27B0;"></div>
 							<div class="color-option ${habit.color === '#00BCD4' ? 'active' : ''}" data-color="#00BCD4" style="background: #00BCD4;"></div>
+							<div class="color-option custom-color-option${!['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4'].includes(habit.color) ? ' active' : ''}" data-color="custom" style="background: ${!['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4'].includes(habit.color) ? habit.color : 'transparent'}; border: 1.5px dashed #aaa; position: relative;">
+								<input type="color" id="editCustomHabitColor" value="${!['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4'].includes(habit.color) ? habit.color : '#4CAF50'}" style="opacity:0;position:absolute;left:0;top:0;width:100%;height:100%;cursor:pointer;">
+								<span style="position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.2em;pointer-events:none;">+</span>
+							</div>
 						</div>
 					</div>
 					<div class="form-actions">
@@ -2651,7 +2743,13 @@ export class RelaxingTodoView extends ItemView {
 		const saveChanges = async () => {
 			const newName = nameInput.value.trim();
 			const selectedColor = modal.querySelector('.color-option.active') as HTMLElement;
-			const newColor = selectedColor?.getAttribute('data-color') || habit.color;
+			let newColor = selectedColor?.getAttribute('data-color') || habit.color;
+			if (newColor === 'custom') {
+				const customColorInput = modal.querySelector('#editCustomHabitColor') as HTMLInputElement;
+				if (customColorInput && customColorInput.value) {
+					newColor = customColorInput.value;
+				}
+			}
 
 			if (!newName) {
 				new Notice(isRomanian ? 'Numele nu poate fi gol!' : 'Name cannot be empty!');
