@@ -1920,14 +1920,27 @@ export class RelaxingTodoView extends ItemView {
 			return;
 		}
 
-		remindersList.innerHTML = sortedReminders.map(reminder => {
+		remindersList.innerHTML = sortedReminders.map((reminder, index) => {
 			const reminderDate = new Date(reminder.dateTime);
 			const dateStr = reminderDate.toLocaleDateString('ro-RO');
 			const timeStr = reminderDate.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
-			
+			const isActive = !reminder.expired;
+			let reorderHtml = '';
+			if (isActive) {
+				const activeRemindersSorted = sortedReminders.filter(r => !r.expired);
+				const activeIndex = activeRemindersSorted.findIndex(r => r.id === reminder.id);
+				reorderHtml = `
+					<div class="reminder-reorder">
+						<button class="reminder-move-up" data-reminder-id="${reminder.id}" title="${isRomanian ? 'Mută în sus' : 'Move up'}" ${activeIndex === 0 ? 'disabled' : ''}>↑</button>
+						<button class="reminder-move-down" data-reminder-id="${reminder.id}" title="${isRomanian ? 'Mută în jos' : 'Move down'}" ${activeIndex === activeRemindersSorted.length - 1 ? 'disabled' : ''}>↓</button>
+					</div>
+				`;
+			} else {
+				reorderHtml = `<div style="width:24px;"></div>`;
+			}
 			return `
-				<div class="reminder-item ${reminder.expired ? 'expired' : ''}" data-reminder-id="${reminder.id}" draggable="true">
-					<div class="drag-handle" title="${isRomanian ? 'Trageți pentru a reordona' : 'Drag to reorder'}">⋮⋮</div>
+				<div class="reminder-item ${reminder.expired ? 'expired' : ''}" data-reminder-id="${reminder.id}">
+					${reorderHtml}
 					<div class="reminder-content">
 						<div class="reminder-text">${reminder.text}</div>
 						<div class="reminder-time">${dateStr} la ${timeStr}</div>
@@ -1957,8 +1970,21 @@ export class RelaxingTodoView extends ItemView {
 			});
 		});
 
-		// Add drag and drop functionality
-		this.setupRemindersDragAndDrop();
+		// Adaugă event listeners pentru reordonare cu săgeți
+		remindersList.querySelectorAll('.reminder-move-up').forEach(btn => {
+			btn.addEventListener('click', async (e) => {
+				e.stopPropagation();
+				const reminderId = parseInt((e.target as HTMLElement).getAttribute('data-reminder-id') || '0');
+				await this.moveReminderUp(reminderId);
+			});
+		});
+		remindersList.querySelectorAll('.reminder-move-down').forEach(btn => {
+			btn.addEventListener('click', async (e) => {
+				e.stopPropagation();
+				const reminderId = parseInt((e.target as HTMLElement).getAttribute('data-reminder-id') || '0');
+				await this.moveReminderDown(reminderId);
+			});
+		});
 	}
 
 	private renderRemindersWithoutDragSetup() {
@@ -2004,8 +2030,7 @@ export class RelaxingTodoView extends ItemView {
 			const timeStr = reminderDate.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 			
 			return `
-				<div class="reminder-item ${reminder.expired ? 'expired' : ''}" data-reminder-id="${reminder.id}" draggable="true">
-					<div class="drag-handle" title="${isRomanian ? 'Trageți pentru a reordona' : 'Drag to reorder'}">⋮⋮</div>
+				<div class="reminder-item ${reminder.expired ? 'expired' : ''}" data-reminder-id="${reminder.id}">
 					<div class="reminder-content">
 						<div class="reminder-text">${reminder.text}</div>
 						<div class="reminder-time">${dateStr} la ${timeStr}</div>
@@ -3714,6 +3739,38 @@ export class RelaxingTodoView extends ItemView {
 
 		// Focus on confirm button
 		setTimeout(() => (confirmBtn as HTMLButtonElement)?.focus(), 100);
+	}
+
+	// Adaug funcțiile moveReminderUp și moveReminderDown
+	private async moveReminderUp(reminderId: number) {
+		const reminder = this.reminders.find(r => r.id === reminderId);
+		if (!reminder || reminder.expired) return;
+		let activeReminders = this.reminders.filter(r => !r.expired);
+		activeReminders.sort((a, b) => (a.order || 0) - (b.order || 0));
+		const index = activeReminders.findIndex(r => r.id === reminderId);
+		if (index <= 0) return;
+		const prev = activeReminders[index - 1];
+		const tempOrder = reminder.order;
+		reminder.order = prev.order;
+		prev.order = tempOrder;
+		this.normalizeOrderValues();
+		await this.saveData();
+		this.renderReminders();
+	}
+	private async moveReminderDown(reminderId: number) {
+		const reminder = this.reminders.find(r => r.id === reminderId);
+		if (!reminder || reminder.expired) return;
+		let activeReminders = this.reminders.filter(r => !r.expired);
+		activeReminders.sort((a, b) => (a.order || 0) - (b.order || 0));
+		const index = activeReminders.findIndex(r => r.id === reminderId);
+		if (index < 0 || index >= activeReminders.length - 1) return;
+		const next = activeReminders[index + 1];
+		const tempOrder = reminder.order;
+		reminder.order = next.order;
+		next.order = tempOrder;
+		this.normalizeOrderValues();
+		await this.saveData();
+		this.renderReminders();
 	}
 
 }
