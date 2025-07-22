@@ -2,6 +2,107 @@
 
 All notable changes to the MindfulDo plugin will be documented in this file.
 
+## [1.2.9.4] - 2025-07-22
+
+### Added
+- **Reminder Reordering**
+  - Reminders can now be reordered using ↑↓ arrow buttons, identical to the system for tasks and habits
+  - Buttons are automatically disabled for the first/last active reminder
+  - Drag-and-drop remains as a fallback option
+- **Custom Habit Color**
+  - You can now pick any custom color for a habit using a color picker, both when adding and editing habits. If you are not satisfied with the preset colors, simply choose your own!
+
+### Fixed
+- **Delete Confirmation Modal**
+  - The confirmation popup for deleting a reminder now closes instantly after confirming, just like for tasks and habits
+
+### Technical
+- Added functions: `moveReminderUp()`, `moveReminderDown()`, `setupRemindersReordering()`
+- New CSS styles for `.reminder-reorder`, `.reminder-move-up`, `.reminder-move-down` (identical to tasks/habits)
+- `deleteReminder` is now async for consistency and better UX
+
+### Changed
+- **Task Addition Order**
+  - New tasks are now added at the top of the list (first), instead of at the end, for a more intuitive workflow
+
+
+## [1.2.9.3] - 2025-07-17
+
+### Fixed
+- **Task Reordering System** - Complete fix for arrow button reordering functionality
+  - Fixed bug where first task couldn't be moved down in any category
+  - Fixed bug where tasks between 3rd and 4th position couldn't be reordered
+  - Fixed inconsistent behavior when filtering by category vs "All" view
+  - Improved logic to work correctly with both completed and incomplete tasks
+  - Added automatic order value normalization to prevent duplicates and inconsistencies
+  - Enhanced button state calculation to properly disable buttons when reordering is not possible
+
+### Improved
+- **Order Value Management** - Enhanced data consistency and reliability
+  - Automatic normalization of order values after any reordering operation
+  - Proper handling of order values when adding new tasks
+  - Consistent sorting behavior across all views and categories
+  - Better separation between completed and incomplete tasks during reordering
+- **User Experience** - More reliable and predictable reordering behavior
+  - Reordering now works consistently in all categories and views
+  - Proper visual feedback with accurate button states
+  - No more "dead zones" where reordering fails
+  - Consistent behavior across desktop and mobile platforms
+
+### Technical
+- Rewritten `moveTaskUp()` and `moveTaskDown()` functions with proper filtering logic
+- Added `normalizeOrderValues()` function to maintain data consistency
+- Enhanced render logic to accurately calculate button disabled states
+- Improved task filtering to work correctly with completion status and categories
+- Added automatic order normalization after task addition and reordering operations
+
+## [1.2.9.2] - 2025-07-07
+
+### Added
+- **Monthly Calendar Layout for Habits** - Complete redesign of habits tracking interface
+  - Full monthly calendar view with all days of the month displayed
+  - Interactive navigation between months with ‹ › arrows
+  - Clear highlight for today's date with accent color
+  - Visual checkmarks (✓) for completed days
+  - Future dates are disabled and visually distinct
+  - Each habit shows with its custom color when completed
+  - Mobile-responsive design that works perfectly on all screen sizes
+
+### Improved
+- **Mobile Experience** - Completely rebuilt for mobile-first design
+  - Touch-friendly day selection with proper tap targets
+  - Responsive grid layout that adapts to screen width
+  - Optimized spacing and sizing for mobile devices
+  - Better visual hierarchy with clear headers and sections
+  - Improved accessibility with proper contrast and focus states
+- **Data Persistence** - Unified rendering system
+  - Eliminated inconsistencies between different render functions
+  - Single source of truth for habits display logic
+  - Guaranteed accurate data saving and retrieval
+  - Fixed layout conflicts that occurred during reordering
+
+### Changed
+- **Visual Design** - Modern card-based layout
+  - Each habit displays as a clean card with header and calendar
+  - Better visual separation between habits
+  - Consistent spacing and typography throughout
+  - Enhanced color usage with proper theming support
+- **User Interaction** - Intuitive calendar interface
+  - Click any day to toggle completion status
+  - Visual feedback with hover effects and animations
+  - Clear indicators for different day states (today, completed, future)
+  - Month navigation specific to habits (independent of main calendar)
+
+### Technical
+- Added `currentHabitsMonth` and `currentHabitsYear` state variables
+- Implemented `generateHabitMonthCalendar()` for dynamic calendar generation
+- Created `setupHabitsEventListeners()` for unified event handling
+- Added `navigateHabitsMonth()` for month navigation
+- Unified `renderHabits()` and `renderHabitsWithoutDragSetup()` to use same logic
+- Added comprehensive CSS with responsive breakpoints and theming support
+- Maintained arrow button reordering system from previous version
+
+
 ## [1.2.9.1] - 2025-07-07
 
 ### Fixed
